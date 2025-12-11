@@ -4,7 +4,7 @@
 \alias{correspondenceTableList}
 \title{Retrieve a list of all correspondence tables in the CELLAR and FAO repositories}
 \usage{
-correspondenceTableList(endpoint, showQuery = FALSE)
+correspondenceTableList(endpoint = "ALL", showQuery = FALSE)
 }
 \arguments{
 \item{endpoint}{Character. SPARQL endpoint(s) to query. Valid values are:
@@ -19,9 +19,9 @@ If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
 \itemize{
   \item Prefix
   \item ID
-  \item Source Classification
-  \item Target Classification
-  \item Table Name
+  \item Source.Classification
+  \item Target.Classification
+  \item Table.Name
   \item URI
 }
 If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s:

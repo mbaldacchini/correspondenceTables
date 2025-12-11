@@ -123,3 +123,53 @@ Testing improvements
   and CSV file paths as input (e.g. `classificationQC()`).
 - Added basic unit tests to ensure internal utilities are not exported and
   that the interface of extraction functions is stable.
+
+- Reworked `classificationList()` to:
+  - use a JSON configuration file for endpoint URLs with sensible fallbacks,
+  - provide a stable `Prefix` (lower-case, no spaces) compatible with
+    `retrieveClassificationTable()`,
+  - add a `Languages` column summarising all languages used in concept labels,
+  - support offline mode via the global option `useLocalDataForVignettes`.
+
+- Made `classificationEndpoint()` a thin deprecated wrapper around
+  `classificationList()`, with dedicated tests checking argument names,
+  returned values and deprecation warnings.
+
+- Updated `aggregateCorrespondenceTable()` and
+  `analyseCorrespondenceTable()` to:
+  - accept both CSV file paths and data.frames for all table inputs (AB, A, B),
+  - standardise input validation through `testInputTable()`,
+  - improve error messages for duplicate codes, missing values and hierarchy
+    inconsistencies,
+  - keep `CSVout` as the last argument and validate it via `testCsvParameter()`.
+
+- Simplified `retrieveClassificationTable()`:
+  - removed the obsolete `localData` argument (behaviour now governed solely by
+    `options(useLocalDataForVignettes = TRUE/FALSE)`),
+  - ensured that both offline (embedded CSV) and online (SPARQL) modes respect
+    the `showQuery` contract (`data.frame` vs list with `SPARQL.query`),
+  - documented the argument order (`endpoint`, `prefix`, `conceptScheme`,
+    `language`, `level`, `CSVout`, `showQuery`).
+
+- Aligned the interface of `retrieveCorrespondenceTable()` so that `endpoint`
+  precedes `prefix` and updated the documentation and tests accordingly.
+
+- Updated `lengthsFile()` to:
+  - clarify that `correction` is a Boolean argument,
+  - handle special classifications (CN, PRODICOM, CPA, etc.) in a more explicit
+    and documented way,
+  - issue clearer warnings when code lengths are inconsistent across levels.
+
+- Reordered arguments of `newCorrespondenceTable()` so that:
+  - the logical/semantic arguments come first (`Tables`, `Reference`,
+    `MismatchTolerance`, `Redundancy_trim`),
+  - `CSVout` is now the final, optional output argument,
+  - examples and tests now call the function with explicit argument names to
+    avoid ambiguity.
+
+- Updated `updateCorrespondenceTable()` so that:
+  - all classification-related inputs (`A`, `B`, `Astar`, `AB`, `AAstar`)
+    accept either CSV file paths or data.frames,
+  - `CSVout` is the last argument,
+  - input validation and CSV export are routed through the same shared helpers
+    as the other correspondence-table functions.

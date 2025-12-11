@@ -6,21 +6,16 @@
 \usage{
 newCorrespondenceTable(
   Tables,
-  CSVout = NULL,
   Reference = "none",
   MismatchTolerance = 0.2,
-  Redundancy_trim = TRUE
+  Redundancy_trim = TRUE,
+  CSVout = NULL
 )
 }
 \arguments{
 \item{Tables}{A string of type character containing the name of a csv file which contains the names of the files that
 contain the classifications and the intermediate correspondence tables OR a list of vectors with the names of the dataframes
 classifications and the intermediate correspondence tables (see "Details" below).}
-
-\item{CSVout}{The preferred name for the \emph{output csv files} that will contain the candidate correspondence table
-and information about the classifications involved. The valid values are \code{NULL} or strings of type \code{character}.
-If the selected value is \code{NULL}, the default, no output file is produced. If the value is a string, then the output
-is exported into two csv files whose names contain the provided name (see "Value" below).}
 
 \item{Reference}{The reference classification among A and B. If a classification is the reference to the other, and hence
 \emph{hierarchically superior} to it, each code of the other classification is expected to be mapped to at most one code
@@ -36,6 +31,11 @@ real numbers in the interval [0, 1].}
 used to facilitate the trimming of the redundant records.
 The default value is \code{TRUE}, which removes all redundant records.
 The other values is \code{FALSE}, which shows redundant records together with the redundancy flag.}
+
+\item{CSVout}{The preferred name for the \emph{output csv files} that will contain the candidate correspondence table
+and information about the classifications involved. The valid values are \code{NULL} or strings of type \code{character}.
+If the selected value is \code{NULL}, the default, no output file is produced. If the value is a string, then the output
+is exported into two csv files whose names contain the provided name (see "Value" below).}
 }
 \value{
 \code{newCorrespondenceTable()} returns a list with two elements, both of which are data frames.
@@ -193,11 +193,13 @@ library. All sample datasets may be found there.
                  col.names = FALSE,
                  sep = ",")
 
-     NCT<-newCorrespondenceTable(file.path(tmp_dir,"example.csv"),
-                                 file.path(tmp_dir,"newCorrespondenceTable.csv"),
-                                 "A",
-                                 0.56,
-                                 FALSE)
+      NCT <- newCorrespondenceTable(
+        Tables            = file.path(tmp_dir, "example.csv"),
+        Reference         = "A",
+        MismatchTolerance = 0.56,
+        Redundancy_trim   = FALSE,
+        CSVout= file.path(tmp_dir, "newCorrespondenceTable.csv")
+        )
 
      summary(NCT)
      head(NCT$newCorrespondenceTable)

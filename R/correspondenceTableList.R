@@ -15,9 +15,9 @@
 #' \itemize{
 #'   \item Prefix
 #'   \item ID
-#'   \item Source Classification
-#'   \item Target Classification
-#'   \item Table Name
+#'   \item Source.Classification
+#'   \item Target.Classification
+#'   \item Table.Name
 #'   \item URI
 #' }
 #' If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s:
@@ -43,13 +43,34 @@
 #'   corr_list <- correspondenceTableList("ALL")
 #'   print(corr_list)
 #' }
-correspondenceTableList <- function(endpoint, showQuery = FALSE) {
+correspondenceTableList <- function(endpoint = "ALL", showQuery = FALSE) {
   endpoint <- toupper(endpoint)
   if (!(endpoint %in% c("ALL", "FAO", "CELLAR"))) {
     stop(simpleError(paste("The endpoint value:", endpoint, "is not accepted")))
   }
   
-  # If ALL: call recursively for both endpoints, propagating showQuery
+  # ---- Offline / vignette mode ----
+  if (getOption("useLocalDataForVignettes", FALSE)) {
+    if (endpoint == "ALL") {
+      return(list(
+        CELLAR = correspondenceTableList("CELLAR", showQuery = showQuery),
+        FAO    = correspondenceTableList("FAO",    showQuery = showQuery)
+      ))
+    }
+    path <- system.file(
+      "extdata",
+      paste0("correspondenceTableList_", endpoint, ".csv"),
+      package = "correspondenceTables"
+    )
+    if (!file.exists(path)) {
+      stop("Local file for correspondenceTableList and endpoint '", endpoint,
+           "' is missing. Expected at: ", path)
+    }
+    df <- utils::read.csv(path, stringsAsFactors = FALSE)
+    return(df)
+  }
+  
+  # ---- If ALL in online mode: recurse on both endpoints ----
   if (endpoint == "ALL") {
     return(list(
       CELLAR = correspondenceTableList("CELLAR", showQuery = showQuery),
@@ -57,7 +78,8 @@ correspondenceTableList <- function(endpoint, showQuery = FALSE) {
     ))
   }
   
-  config <- fromJSON(
+  # ---- Online mode for a single endpoint ----
+  config <- jsonlite::fromJSON(
     "https://raw.githubusercontent.com/eurostat/correspondenceTables/refs/heads/main/inst/extdata/endpoint_source_config.json"
   )
   source <- config[[endpoint]]
@@ -80,7 +102,7 @@ correspondenceTableList <- function(endpoint, showQuery = FALSE) {
   for (i in seq_along(prefixes_loop)) {
     prefix <- prefixes_loop[i]
     
-    # exceptions où le séparateur change
+    # Exceptions where the separator changes
     if (prefix %in% c("FCL:", "ICC10:", "ICC11:", "ISIC4:")) {
       sep <- "--"
     }
@@ -109,11 +131,14 @@ correspondenceTableList <- function(endpoint, showQuery = FALSE) {
       
       response <- httr::POST(
         url   = source,
-        accept("text/csv"),
+        httr::accept("text/csv"),
         body  = list(query = SPARQL.query),
         encode = "form"
       )
-      df <- read.csv(text = content(response, "text"), stringsAsFactors = FALSE)
+      df <- utils::read.csv(
+        text = httr::content(response, "text"),
+        stringsAsFactors = FALSE
+      )
       
       if (nrow(df) == 0) {
         df <- data.frame(prefix = character(), df)
@@ -135,5 +160,31 @@ correspondenceTableList <- function(endpoint, showQuery = FALSE) {
     })
   }
   
-  return(data_t)
+  # ---- Bind all prefixes into a single data.frame ----
+  if (length(data_t) == 0L) {
+    out <- data.frame(
+      Prefix               = character(),
+      ID                   = character(),
+      Source.Classification = character(),
+      Target.Classification = character(),
+      Table.Name           = character(),
+      URI                  = character(),
+      stringsAsFactors     = FALSE
+    )
+  } else {
+    out <- do.call(rbind, data_t)
+    # Expected columns: prefix, ID_table, A, B, Table, URL
+    if (ncol(out) >= 6) {
+      colnames(out)[1:6] <- c(
+        "Prefix",
+        "ID",
+        "Source.Classification",
+        "Target.Classification",
+        "Table.Name",
+        "URI"
+      )
+    }
+  }
+  
+  out
 }

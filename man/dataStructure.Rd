@@ -38,7 +38,7 @@ the SPARQL query together with \code{prefix} to select the target scheme.}
 \item{language}{Character string giving the language code for level labels.
 Defaults to \code{"en"}.}
 
-\item{showQuery}{Logical.
+\item{showQuery}{Boolean; if \code{TRUE}, the SPARQL query
 If \code{FALSE} (default), only the resulting data frame is returned.  
 If \code{TRUE}, the function returns a list containing:
 \itemize{

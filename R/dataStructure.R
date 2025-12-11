@@ -36,7 +36,7 @@
 #' @param language Character string giving the language code for level labels.
 #'   Defaults to \code{"en"}.
 #'
-#' @param showQuery Logical.  
+#' @param showQuery Boolean; if \code{TRUE}, the SPARQL query
 #'   If \code{FALSE} (default), only the resulting data frame is returned.  
 #'   If \code{TRUE}, the function returns a list containing:
 #'   \itemize{

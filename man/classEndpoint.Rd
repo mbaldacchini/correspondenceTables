@@ -2,29 +2,23 @@
 % Please edit documentation in R/classEndpoint.R
 \name{classEndpoint}
 \alias{classEndpoint}
-\title{Retrieve a list of classification tables in CELLAR, FAO or both.}
+\title{Deprecated alias for classificationList}
 \usage{
-classEndpoint(endpoint)
+classEndpoint(endpoint = "ALL")
 }
 \arguments{
-\item{endpoint}{A string of type character containing the endpoint where the table is stored. 
-The valid values are \code{"CELLAR"}, \code{"FAO"} and \code{"ALL"} for both endpoints.}
+\item{endpoint}{Character. One of "CELLAR", "FAO", "ALL".}
 }
 \value{
-\code{classEndpoint()} returns a table with information needed to retrieve the classification table:
-\itemize{
-    \item Prefix name: the  SPARQL instruction for a declaration of a namespace prefix
-    \item Conceptscheme: taxonomy of the SKOS object to be retrieved
-    \item URI: the URL from which the SPARQL query was retrieved
-    \item Name: the name of the table retrieved
-}
+Output of classificationList().
 }
 \description{
-Retrieve a list of classification tables in CELLAR, FAO or both.
+`classEndpoint()` is deprecated.  
+Please use [classificationList()] instead.
 }
 \examples{
-{
-    endpoint = "ALL"
-    list_data = classEndpoint(endpoint)
-    }
+\dontrun{
+classEndpoint("ALL")   # deprecated
+classificationList("ALL")  # use this instead
+}
 }

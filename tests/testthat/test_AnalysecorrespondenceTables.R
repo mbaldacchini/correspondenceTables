@@ -280,4 +280,35 @@ test_that("test_9 - unmatched codes are correctly detected and reported", {
     info = "Expected a warning about unmatched target classification codes in B"
   )
 })
+test_that("analyseCorrespondenceTable has AB, A, B as first arguments and runs on a simple example", {
+  skip_on_cran()
+  
+  # Check formal argument order
+  args <- names(formals(analyseCorrespondenceTable))
+  expect_identical(args[1:3], c("AB", "A", "B"))
+  
+  # Minimal AB-only example (A and B left NULL)
+  AB_df <- data.frame(
+    Acode = c("A1", "A2"),
+    Bcode = c("B1", "B2"),
+    stringsAsFactors = FALSE
+  )
+  
+  # Should run without error with the new ordering
+  expect_error(
+    res <- analyseCorrespondenceTable(
+      AB = AB_df,
+      A  = NULL,
+      B  = NULL,
+      longestAcodeOnly          = FALSE,
+      longestBcodeOnly          = FALSE,
+      CSVcorrespondenceInventory = NULL,
+      CSVcorrespondenceAnalysis  = NULL
+    ),
+    NA
+  )
+  
+  expect_type(res, "list")
+  expect_true(all(c("Inventory", "Analysis") %in% names(res)))
+})
 

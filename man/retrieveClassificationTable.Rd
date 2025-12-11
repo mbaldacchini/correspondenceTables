@@ -11,8 +11,7 @@ retrieveClassificationTable(
   language = "en",
   level = "ALL",
   CSVout = NULL,
-  showQuery = FALSE,
-  localData = NULL
+  showQuery = FALSE
 )
 }
 \arguments{
@@ -24,9 +23,9 @@ Must be one of:
 }}
 
 \item{prefix}{Character string giving the namespace prefix associated
-with the targeted classification scheme.  
+with the targeted classification scheme.
 This value should match the \code{Prefix} column returned by
-\code{\link{classificationEndpoint}} and is required to build:
+\code{\link{classificationList}} and is required to build:
 \itemize{
   \item the \code{PREFIX} declarations (via \code{prefixList}),
   \item the fully-qualified scheme name (e.g. \code{prefix:conceptScheme}).
@@ -34,13 +33,13 @@ This value should match the \code{Prefix} column returned by
 
 \item{conceptScheme}{Character string identifying the classification
 scheme to retrieve, typically obtained from the
-\code{ConceptScheme} column of \code{\link{classificationEndpoint}}.}
+\code{ConceptScheme} column of \code{\link{classificationList}}.}
 
 \item{language}{Character string giving the language used for labels and
 notes. Defaults to \code{"en"}.}
 
 \item{level}{Character string specifying which hierarchical level to
-retrieve.  
+retrieve.
 \itemize{
   \item \code{"ALL"} (default): retrieve every level.
   \item A numeric depth (e.g. \code{"1"}, \code{"2"}): retrieve only
@@ -50,7 +49,7 @@ If the classification has no defined levels (as detected by
 \code{\link{dataStructure}}), the function automatically resets
 \code{level = "ALL"} with a message.}
 
-\item{CSVout}{Logical or character. Controls CSV export:
+\item{CSVout}{Boolean or character. Controls CSV export:
 \itemize{
   \item \code{NULL} (default): no export.
   \item \code{TRUE}: export to a default filename based on
@@ -58,14 +57,9 @@ If the classification has no defined levels (as detected by
   \item character: explicit path to a CSV file.
 }}
 
-\item{showQuery}{Logical. If \code{TRUE} (default), returns a list
-containing both the SPARQL query and the resulting table.  
+\item{showQuery}{Boolean. If \code{TRUE} (default), returns a list
+containing both the SPARQL query and the resulting table.
 If \code{FALSE}, only the table (data frame) is returned.}
-
-\item{localData}{Logical (reserved for future use).
-When the global option \code{useLocalDataForVignettes = TRUE} is set,
-the function attempts to read an embedded CSV file instead of querying
-the live endpoints.}
 }
 \value{
 If \code{showQuery = TRUE} (default), returns a list with:
@@ -78,27 +72,25 @@ If \code{showQuery = TRUE} (default), returns a list with:
 If \code{showQuery = FALSE}, only the classification table is returned.
 }
 \description{
-Retrieves a full classification table codes, labels, hierarchical
-relationships, and associated notes from the CELLAR or FAO SPARQL
-repositories.  
+Retrieves a full classification table (codes, labels, hierarchical
+relationships, and associated notes) from the CELLAR or FAO SPARQL
+repositories.
 The function supports optional filtering by hierarchical level and
 automatic use of local embedded data for vignette building.
 }
 \details{
-Behaviour depends on the global option
-\code{useLocalDataForVignettes}:
+Behaviour depends on the global option \code{useLocalDataForVignettes}:
 \itemize{
-  \item If \code{TRUE}:  
+  \item If \code{TRUE}:
         the function searches for a local embedded CSV file (in
         \code{inst/extdata}) matching the requested \code{prefix} and
-        \code{language}.  
-        If found, it is returned immediately and no SPARQL call is made.
+        \code{language}. If found, it is returned immediately and no
+        SPARQL call is made.
 
-  \item If \code{FALSE}:  
+  \item If \code{FALSE}:
         the function:
         \itemize{
-          \item builds SPARQL prefix declarations via
-                \code{prefixList},
+          \item builds SPARQL prefix declarations via \code{prefixList},
           \item calls \code{\link{dataStructure}} to determine level
                 availability and adjust \code{level} when necessary,
           \item constructs and submits a SPARQL query to the selected
@@ -142,8 +134,4 @@ Clear, user-friendly errors are raised if:
   }
 }
 
-}
-\seealso{
-\code{\link{classificationEndpoint}},
-\code{\link{dataStructure}}
 }

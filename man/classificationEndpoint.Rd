@@ -4,14 +4,20 @@
 \alias{classificationEndpoint}
 \title{List available classification schemes (deprecated wrapper)}
 \usage{
-classificationEndpoint(endpoint = "ALL")
+classificationEndpoint(endpoint = "ALL", showQuery = FALSE)
 }
 \arguments{
 \item{endpoint}{Character string indicating which endpoint to query.
 Valid values are \code{"CELLAR"}, \code{"FAO"} or \code{"ALL"}.}
+
+\item{showQuery}{Logical. If \code{TRUE}, the underlying SPARQL query (or
+queries) used by \code{classificationList()} are returned or printed,
+depending on the implementation of that function. If \code{FALSE}
+(default), only the classification list is returned.}
 }
 \value{
-The same object as returned by \code{classificationList(endpoint = endpoint)}.
+The same object as returned by
+\code{classificationList(endpoint = endpoint, showQuery = showQuery)}.
 }
 \description{
 This function is deprecated and kept only for backward compatibility.
@@ -26,9 +32,9 @@ This function is deprecated. It is now a thin wrapper around
 
 \examples{
 \dontrun{
-# Deprecated: please use classificationList() instead.
-cl <- classificationEndpoint("ALL")
-print(cl)
+  # Deprecated: please use classificationList() instead.
+  cl <- classificationEndpoint("ALL", showQuery = FALSE)
+  print(cl)
 }
 
 }

@@ -10,11 +10,11 @@ updateCorrespondenceTable(
   AStar,
   AB,
   AAStar,
-  CSVout = NULL,
   Reference = "none",
   MismatchToleranceB = 0.2,
   MismatchToleranceAStar = 0.2,
-  Redundancy_trim = TRUE
+  Redundancy_trim = TRUE,
+  CSVout = NULL
 )
 }
 \arguments{
@@ -28,11 +28,6 @@ updateCorrespondenceTable(
 
 \item{AAStar}{A string of the type character containing the name of a csv file that contains the \emph{concordance table} A:A*,
 which contains the mapping between the codes of the two versions of the classification.}
-
-\item{CSVout}{The preferred name for the \emph{output csv files} that will contain the updated correspondence table and
-information about the classifications involved. The valid values are \code{NULL} or strings of type \code{character}. If
-the selected value is \code{NULL}, the default, no output file is produced. If the value is a string, then the output is
-exported into two csv files whose names contain the provided name (see "Value" below).}
 
 \item{Reference}{The reference classification among A and B. If a classification is the reference to the other, and
 hence \emph{hierarchically superior} to it, each code of the other classification is expected to be mapped to at most one
@@ -50,6 +45,11 @@ is \code{0.2}. The valid values are real numbers in the interval [0, 1].}
 \item{Redundancy_trim}{An argument used to facilitate the trimming of the redundant records. The valid logical values are \code{TRUE} or  \code{FALSE}.
 The default value is \code{TRUE}, which removes all redundant records, replacing the values of Acode Alabel and Asupp with the value ‘Multiple’ (to indicate that multiple A records are involved). If the multiple A records are the same, their value will not be replaced. 
 The other values is \code{FALSE}, which shows redundant records together with the redundancy flag.}
+
+\item{CSVout}{The preferred name for the \emph{output csv files} that will contain the updated correspondence table and
+information about the classifications involved. The valid values are \code{NULL} or strings of type \code{character}. If
+the selected value is \code{NULL}, the default, no output file is produced. If the value is a string, then the output is
+exported into two csv files whose names contain the provided name (see "Value" below).}
 }
 \value{
 \code{updateCorrespondenceTable()} returns a list with two elements, both of which are data frames.
@@ -203,16 +203,18 @@ library. All sample datasets may be found there.
  AB <- system.file("extdata", "NAICS2017_NACE.csv", package = "correspondenceTables")
  AAStar <- system.file("extdata", "NAICS2017_NAICS2022.csv", package = "correspondenceTables")
 
- UPC <- updateCorrespondenceTable(A,
-                                  B,
-                                  AStar,
-                                  AB,
-                                  AAStar,
-                                  file.path(tmp_dir,"updateCorrespondenceTable.csv"),
-                                  "none",
-                                  0.5,
-                                  0.3,
-                                  FALSE)
+  UPC <- updateCorrespondenceTable(
+     A = A,
+     B = B,
+     AStar = AStar,
+     AB = AB,
+ AAStar = AAStar,
+ Reference = "none",
+ MismatchToleranceB = 0.5,
+ MismatchToleranceAStar = 0.3,
+ Redundancy_trim = FALSE,
+ CSVout = file.path(tmp_dir, "updateCorrespondenceTable.csv")
+          )
 
  summary(UPC)
  head(UPC$updateCorrespondenceTable)

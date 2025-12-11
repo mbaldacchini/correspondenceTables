@@ -1,2 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^\\.github$
+^doc$
+^docs$
+^test$
+^classificationListCellar\\.csv$

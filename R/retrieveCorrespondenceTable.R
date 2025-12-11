@@ -1,27 +1,9 @@
 #' @title Retrieve correspondence tables between statistical classifications from CELLAR and FAO repositories.
+#'
 #' @description
 #' This function retrieves a correspondence (mapping) table between two
 #' statistical classifications stored as Linked Open Data in the CELLAR or
-#' FAO repositories. A correspondence table links codes from a *source*
-#' classification to related codes in a *target* classification, together
-#' with optional labels and notes (include, exclude, comments).
-#'
-#' The function automatically:
-#' \itemize{
-#'   \item identifies the source and target classification prefixes from
-#'         \code{ID_table},
-#'   \item builds the required SPARQL namespace declarations using
-#'         \code{prefixList},
-#'   \item issues a SPARQL query against the selected endpoint,
-#'   \item extracts labels and notes in the requested language.
-#' }
-#'
-#'
-#' @param prefix Character string giving the namespace prefix of the
-#'   correspondence table itself.  
-#'   This prefix must match the prefix used to identify the correspondence
-#'   scheme in the CELLAR or FAO repository (e.g. \code{"cn2022"},
-#'   \code{"cpa2015"}, etc.).
+#' FAO repositories.
 #'
 #' @param endpoint Character string indicating which SPARQL endpoint to
 #'   query. Must be one of:
@@ -30,68 +12,42 @@
 #'     \item \code{"FAO"}
 #'   }
 #'
+#' @param prefix Character string giving the namespace prefix of the
+#'   correspondence table itself.
+#'   This prefix must match the prefix used to identify the correspondence
+#'   scheme in the CELLAR or FAO repository (e.g. \code{"cn2022"},
+#'   \code{"cpa2015"}, etc.).
+#'
 #' @param ID_table Character string giving the identifier of the
-#'   correspondence table to retrieve (e.g. \code{"CN2022_NST2007"}).  
-#'   The part before the underscore is treated as the *source*
-#'   classification prefix, and the part after the underscore as the
-#'   *target* prefix.
+#'   correspondence table to retrieve (e.g. \code{"CN2022_NST2007"}).
 #'
 #' @param language Character string indicating the language used for labels
 #'   and notes. Defaults to \code{"en"}.
 #'
 #' @param CSVout Logical or character. Controls CSV export:
-#' \itemize{
-#'   \item \code{FALSE} (default): no file is written,
-#'   \item \code{TRUE}: the table is written to \code{<ID_table>_table.csv},
-#'   \item character: explicit filepath where the table is saved.
-#' }
+#'   \itemize{
+#'     \item \code{FALSE} (default): no file is written,
+#'     \item \code{TRUE}: the table is written to \code{<ID_table>_table.csv},
+#'     \item character: explicit filepath where the table is saved.
+#'   }
 #'
 #' @param showQuery Logical. If \code{TRUE} (default), the function returns
 #'   a list containing both the SPARQL query and the resulting correspondence
 #'   table. If \code{FALSE}, only the table (data frame) is returned.
 #'
-#'
-#' @details
-#' Internally, the function:
-#' \itemize{
-#'   \item builds SPARQL prefixes from the source and target classifications,
-#'   \item queries the repository for:
-#'         \itemize{
-#'           \item source code
-#'           \item target code
-#'           \item labels in the selected language
-#'           \item include/exclude notes
-#'           \item optional mapping comments
-#'         }
-#'   \item ensures that only plain-literal notations are kept if multiple
-#'         datatypes exist,
-#'   \item removes datatype columns before returning the final table.
-#' }
-#'
-#'
 #' @return
 #' If \code{showQuery = TRUE}, a list with:
 #' \itemize{
 #'   \item \code{SPARQL.query}: the full SPARQL query,
-#'   \item \code{CorrespondenceTable}: a data frame containing one row per
-#'         mapping between source and target codes.
+#'   \item \code{CorrespondenceTable}: a data frame with one row per mapping.
 #' }
 #'
-#' If \code{showQuery = FALSE}, only the correspondence table
-#' (data frame) is returned.
+#' If \code{showQuery = FALSE}, only the correspondence table (data frame)
+#' is returned.
 #'
-#' The returned table may contain the following columns:
-#' \itemize{
-#'   \item \code{<A>}: code in the source classification,
-#'   \item \code{<B>}: code in the target classification,
-#'   \item \code{Label_<A>}: label of the source code,
-#'   \item \code{Include_<A>}, \code{Exclude_<A>}: source notes,
-#'   \item \code{Label_<B>}: label of the target code,
-#'   \item \code{Include_<B>}, \code{Exclude_<B>}: target notes,
-#'   \item \code{Comment}: optional mapping-level comment,
-#'   \item \code{URL}: URI of the association object.
-#' }
-#'
+#' @seealso
+#' \code{\link{classificationEndpoint}},
+#' \code{\link{retrieveClassificationTable}}
 #'
 #' @examples
 #' \dontrun{
@@ -99,21 +55,27 @@
 #'   prefix   <- "cn2022"
 #'   ID_table <- "CN2022_NACE2"
 #'
-#'   results <- retrieveCorrespondenceTable(prefix, endpoint, ID_table)
+#'   res <- retrieveCorrespondenceTable(
+#'     endpoint = endpoint,
+#'     prefix   = prefix,
+#'     ID_table = ID_table
+#'   )
 #'
-#'   # Show SPARQL query
-#'   cat(results$SPARQL.query)
-#'
-#'   # Show the first rows of the correspondence table
-#'   head(results$CorrespondenceTable)
+#'   cat(res$SPARQL.query)
+#'   head(res$CorrespondenceTable)
 #' }
-#'
-#' @seealso
-#' \code{\link{classificationEndpoint}},
-#' \code{\link{retrieveClassificationTable}}
 #'
 #' @import httr
 #' @export
+retrieveCorrespondenceTable <- function(endpoint,
+                                        prefix,
+                                        ID_table,
+                                        language = "en",
+                                        CSVout = FALSE,
+                                        showQuery = TRUE) {
+  # ton code ici...
+}
+
 
 
 retrieveCorrespondenceTable = function(endpoint,
@@ -121,7 +83,7 @@ retrieveCorrespondenceTable = function(endpoint,
                                        ID_table,
                                        language = "en",
                                        CSVout   = FALSE,
-                                       showQuery = FALSE) {
+                                       showQuery = TRUE) {
   #-------------------------------
   # 0. Normalize / validate endpoint
   #-------------------------------

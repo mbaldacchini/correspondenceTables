@@ -111,8 +111,6 @@
 #' @import jsonlite
 #' @importFrom utils capture.output str
 #' @export
-
-
 classificationList <- function(endpoint = "ALL", showQuery = FALSE) {
   endpoint <- toupper(endpoint)
   if (!(endpoint %in% c("ALL", "FAO", "CELLAR"))) {
@@ -146,14 +144,12 @@ classificationList <- function(endpoint = "ALL", showQuery = FALSE) {
   cfg_url <- "https://raw.githubusercontent.com/eurostat/correspondenceTables/refs/heads/main/inst/extdata/endpoint_source_config.json"
   config <- tryCatch(jsonlite::fromJSON(cfg_url), error = function(e) NULL)
   if (is.null(config)) {
-    # Fallbacks (ajuste au besoin)
     config <- list(
       CELLAR = "https://publications.europa.eu/webapi/rdf/sparql",
       FAO    = "https://stats.fao.org/caliper/sparql"
     )
   }
   
-  # ---- Build SPARQL per endpoint (Variant B) ----
   SPARQL.query <- ""
   endpoint_url <- ""
   
@@ -164,7 +160,6 @@ classificationList <- function(endpoint = "ALL", showQuery = FALSE) {
     ))
   } else if (endpoint == "CELLAR") {
     endpoint_url <- config$CELLAR
-    # Variant B + data.europa.eu filter + exclude eurovoc + ESTAT link; languages from concepts
     SPARQL.query <- "
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
@@ -184,7 +179,6 @@ WHERE {
     STRSTARTS(STR(?scheme), 'https://data.europa.eu/')
   )
 
-
   ?scheme ?p <http://publications.europa.eu/resource/authority/corporate-body/ESTAT> .
 
   OPTIONAL { ?scheme skos:notation ?notation }
@@ -199,7 +193,6 @@ ORDER BY ?Prefix
 "
   } else {
     endpoint_url <- config$FAO
-    # Variant B for FAO (languages from concepts, EN title at scheme level)
     SPARQL.query <- "
 PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -232,7 +225,6 @@ if (isTRUE(showQuery)) {
   message(SPARQL.query)
 }
 
-# ---- Execute query ----
 out <- tryCatch({
   resp <- httr::POST(
     url    = endpoint_url,
@@ -251,6 +243,7 @@ out <- tryCatch({
   
   uri    <- df[["URI"]]
   prefix <- if (endpoint == "CELLAR") gsub("\\.", "", df[["Prefix"]]) else df[["Prefix"]]
+  prefix <- .ct_clean_prefix(prefix)
   title  <- df[["Title"]]
   langs  <- df[["Languages"]]
   
@@ -267,7 +260,7 @@ out <- tryCatch({
 }, error = function(e) {
   message("The following SPARQL code was used in the call:\n", SPARQL.query)
   message("The above SPARQL call to ", endpoint_url, " generated the following error message:\n", conditionMessage(e))
-  stop(simpleError(paste("Error in function ClassificationList(", endpoint, "), Endpoint", endpoint, "is not available or is returning unexpected data")))
+  stop(simpleError(paste("Error in function classificationList(", endpoint, "), Endpoint", endpoint, "is not available or is returning unexpected data")))
 })
 
 if (showQuery) {
@@ -275,4 +268,28 @@ if (showQuery) {
 } else {
   return(out)
 }
+}
+
+# -------------------------------------------------------------------
+# Internal helper to normalise classification prefix codes
+# -------------------------------------------------------------------
+#' @keywords internal
+#' @noRd
+.ct_clean_prefix <- function(prefix) {
+  prefix <- tolower(prefix)
+  
+  # remove version suffixes like "_v2.1" or "-v2"
+  prefix <- sub("(_v[0-9.]+)$", "", prefix)
+  prefix <- sub("(-v[0-9.]+)$", "", prefix)
+  
+  # remove dots
+  prefix <- gsub("\\.", "", prefix)
+  
+  # remove all spaces
+  prefix <- gsub(" ", "", prefix)
+  
+  # remove weird characters (keep letters, numbers, underscore)
+  prefix <- gsub("[^a-z0-9_]", "", prefix)
+  
+  trimws(prefix)
 }

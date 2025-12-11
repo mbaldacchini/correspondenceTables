@@ -2,21 +2,26 @@
 % Please edit documentation in R/correspondenceList.R
 \name{correspondenceList}
 \alias{correspondenceList}
-\title{Overview of available correspondence tables (deprecated wrapper)}
+\title{Deprecated alias for correspondenceTableList}
 \usage{
-correspondenceList(endpoint)
+correspondenceList(endpoint = "ALL", showQuery = FALSE)
 }
 \arguments{
-\item{endpoint}{Character. SPARQL endpoint(s) to query. Valid values are
-\code{"CELLAR"}, \code{"FAO"} or \code{"ALL"}.}
+\item{endpoint}{Character string indicating which endpoint to query.
+Valid values typically include \code{"CELLAR"}, \code{"FAO"} or \code{"ALL"}.}
+
+\item{showQuery}{Logical. If \code{TRUE}, \code{correspondenceTableList()}
+will also return the underlying SPARQL query (or queries), depending on its
+implementation. Defaults to \code{FALSE}.}
 }
 \value{
 The same object as returned by
-\code{correspondenceTableList(endpoint = endpoint)}.
+\code{correspondenceTableList(endpoint = endpoint, showQuery = showQuery)}.
 }
 \description{
 This function is deprecated and kept only for backward compatibility.
-Users should now use \code{correspondenceTableList()} instead.
+Users should now use \code{correspondenceTableList()} instead, which provides
+the same functionality with a clearer and more stable interface.
 }
 \section{Deprecated}{
 
@@ -26,9 +31,9 @@ This function is deprecated. It is now a thin wrapper around
 
 \examples{
 \dontrun{
-# Deprecated: please use correspondenceTableList() instead.
-corr_list <- correspondenceList("ALL")
-print(corr_list)
+  # Deprecated: please use correspondenceTableList() instead.
+  x <- correspondenceList("ALL", showQuery = FALSE)
+  str(x)
 }
 
 }

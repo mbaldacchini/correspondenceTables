@@ -7,47 +7,64 @@
 analyseCorrespondenceTable(
   AB,
   A = NULL,
-  longestAcodeOnly = FALSE,
   B = NULL,
+  longestAcodeOnly = FALSE,
   longestBcodeOnly = FALSE,
   CSVcorrespondenceInventory = NULL,
   CSVcorrespondenceAnalysis = NULL
 )
 }
 \arguments{
-\item{AB}{A mandatory argument containing a CSV file provide by the user contains the correspondence table data with columns "Acode" and "Bcode".}
+\item{AB}{A mandatory argument containing a CSV file provided by the user
+with the correspondence table data. The table must contain at least the
+columns \code{"Acode"} and \code{"Bcode"}.}
 
-\item{A}{A path to a CSV file containing source classification data with "Acode" column.}
+\item{A}{A path to a CSV file containing source classification data with
+an \code{"Acode"} column. Can be \code{NULL} if no source classification
+table is provided.}
 
-\item{longestAcodeOnly}{A Boolean argument to filter source classification data based on "Acode" retaining only the maximum length, thus the lowest level Acode .}
+\item{B}{A path to a CSV file containing target classification data with
+a \code{"Bcode"} column. Can be \code{NULL} if no target classification
+table is provided.}
 
-\item{B}{A path to a CSV file containing target classification data with "Bcode" column.}
+\item{longestAcodeOnly}{Logical. If \code{TRUE}, source classification data
+are filtered based on \code{"Acode"} retaining only the maximum length,
+i.e. the lowest-level Acodes in the correspondence table.}
 
-\item{longestBcodeOnly}{A Boolean argument to filter source classification data based on "Bcode" retaining only the maximum length, thus the lowest level Bcode.}
+\item{longestBcodeOnly}{Logical. If \code{TRUE}, target classification data
+are filtered based on \code{"Bcode"} retaining only the maximum length,
+i.e. the lowest-level Bcodes in the correspondence table.}
 
-\item{CSVcorrespondenceInventory}{The valid values are not NULL if the user put a path with a empty csv file it will return it with the correspondeceInventory or just a path with a csv file . By default no CSV is produce}
+\item{CSVcorrespondenceInventory}{Character string giving the path to a CSV
+file where the correspondence inventory should be written. If \code{NULL},
+no CSV is produced.}
 
-\item{CSVcorrespondenceAnalysis}{Provide an output containing the correpondenceAnalysis. the user put a path a empty file it will return with correpondenceAnalysis. by default no CSV is produce}
+\item{CSVcorrespondenceAnalysis}{Character string giving the path to a CSV
+file where the correspondence analysis should be written. If \code{NULL},
+no CSV is produced.}
 }
 \value{
-A list containing two data frames: Inventory and Analysis.
-The `CSVcorrespondenceInventory` contains statistics related to components, correspondence types, and source/target positions.
-The `CSVcorrespondenceAnalysis` contains statistics for each class in the correspondence table.
+A list containing two data frames: \code{Inventory} and \code{Analysis}.
+  \code{Inventory} contains statistics related to components, correspondence
+  types, and source/target positions. \code{Analysis} contains statistics for
+  each class in the correspondence table.
 }
 \description{
-Perform analysis on a correspondence table using its associated classifications to generate various statistics.
-It checks the validity of the input data, identifies components, calculates correspondence types, and creates summary tables.
+Perform analysis on a correspondence table using its associated
+classifications to generate various statistics. It checks the validity of the
+input data, identifies components, calculates correspondence types, and
+creates summary tables.
 }
 \examples{
 # Use data from the folder extdata
 result <- analyseCorrespondenceTable(
   AB = system.file("extdata", "ExempleAnnexe.csv", package = "correspondenceTables"),
-  A = NULL,
-  longestAcodeOnly = FALSE,
-  B = NULL,
-  longestBcodeOnly = FALSE,
+  A  = NULL,
+  B  = NULL,
+  longestAcodeOnly          = FALSE,
+  longestBcodeOnly          = FALSE,
   CSVcorrespondenceInventory = NULL,
-  CSVcorrespondenceAnalysis = NULL
+  CSVcorrespondenceAnalysis  = NULL
 )
 print(result$Inventory)
 print(result$Analysis)

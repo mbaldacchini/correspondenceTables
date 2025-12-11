@@ -1,29 +1,61 @@
 #' @title Aggregate a correspondence table to higher hierarchical levels
 #' @description Aggregate a correspondence table to higher hierarchical levels.
-#' @param AB A mandatory argument containing a correspondence table data frame with columns "Acode" and "Bcode" representing the correspondence between classifications A and B at the most granular level. This argument is mandatory
-#' @param A A path to a CSV file containing source classification data with an Acode ALevel,ASuperior column. This argument is mandatory
-#' @param B A path to a CSV file containing target classification data with a Bcode Blevel BSuperior column. This argument is mandatory
-#' @param CSVout a character string providing the path where the aggregated correspondence table CSV file should be saved. If NULL, no CSV file is generated.
+#'
+#' @param AB A mandatory argument containing either:
+#'   \itemize{
+#'     \item a data frame with columns \code{Acode} and \code{Bcode} representing
+#'           the correspondence between classifications A and B at the most
+#'           granular level, or
+#'     \item a character string giving the path to a CSV file containing such a table.
+#'   }
+#' @param A A mandatory argument containing either:
+#'   \itemize{
+#'     \item a data frame with columns \code{Acode}, \code{ALevel} and \code{ASuperior}
+#'           describing the hierarchy of the source classification A, or
+#'     \item a character string giving the path to a CSV file containing such a table.
+#'   }
+#' @param B A mandatory argument containing either:
+#'   \itemize{
+#'     \item a data frame with columns \code{Bcode}, \code{BLevel} and \code{BSuperior}
+#'           describing the hierarchy of the target classification B, or
+#'     \item a character string giving the path to a CSV file containing such a table.
+#'   }
+#' @param CSVout A character string providing the path where the aggregated
+#'   correspondence table CSV file should be saved. If \code{NULL}, no CSV file
+#'   is generated.
 #'
 #' @return A data frame representing the aggregated correspondence table.
-#'@import jsonlite
+#' @import jsonlite
 #' @export
+#'
 #' @examples
-#' # Use data from the folder extdata
-#' AB <- (system.file("extdata", "ab_data.csv", package = "correspondenceTables"))
-#' A <- (system.file("extdata", "a_data.csv", package = "correspondenceTables"))
-#' B <- (system.file("extdata", "b_data.csv", package = "correspondenceTables"))
+#' # Using CSV paths from the extdata folder
+#' AB_path <- system.file("extdata", "ab_data.csv", package = "correspondenceTables")
+#' A_path  <- system.file("extdata", "a_data.csv",  package = "correspondenceTables")
+#' B_path  <- system.file("extdata", "b_data.csv",  package = "correspondenceTables")
 #'
-#'
-#' result <- aggregateCorrespondenceTable(AB = AB, A = A, B = B, CSVout = NULL)
-#' print(result)
-#'
+#' result <- aggregateCorrespondenceTable(AB = AB_path, A = A_path, B = B_path, CSVout = NULL)
+
 aggregateCorrespondenceTable <- function(AB, A, B, CSVout = NULL ) {
-
-  ab_data <- testInputTable("Correspondence table (AB)", AB)
-  a_data <- testInputTable("Source classification (A)", A)
-  b_data <- testInputTable("Target classification (B)", B)
-
+  
+  # Allow both data.frame and CSV path for all three inputs
+  if (is.data.frame(AB)) {
+    ab_data <- AB
+  } else {
+    ab_data <- testInputTable("Correspondence table (AB)", AB)
+  }
+  
+  if (is.data.frame(A)) {
+    a_data <- A
+  } else {
+    a_data <- testInputTable("Source classification (A)", A)
+  }
+  
+  if (is.data.frame(B)) {
+    b_data <- B
+  } else {
+    b_data <- testInputTable("Target classification (B)", B)
+  }
 #Check if required number of columns are present in each input
 check_n_columns(ab_data,"Correspondence table (AB)", 2)
 check_n_columns(a_data, "Source classification (A)", 3)

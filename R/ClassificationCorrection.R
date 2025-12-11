@@ -6,11 +6,7 @@
 #'
 #' @keywords internal
 #' @noRd
-correctionClassification <- function(classification, prefix) {
-  ...
-}
-
-correctionClassification <- function(classification, prefix) {
+ClassificationCorrection <- function(classification, prefix) {
   # Basic checks on inputs
   if (!is.data.frame(classification)) {
     stop("`classification` must be a data.frame.")
@@ -19,6 +15,9 @@ correctionClassification <- function(classification, prefix) {
   if (missing(prefix) || !is.character(prefix) || length(prefix) != 1L) {
     stop("`prefix` must be a single character string (e.g. 'nace2', 'cn2022').")
   }
+  
+  # Normalise prefix (we expect lower-case, consistent with classificationList)
+  prefix <- tolower(prefix)
   
   # Identify code and label columns:
   # - code column is assumed to be named as the prefix (e.g. "cn2022")
@@ -45,9 +44,8 @@ correctionClassification <- function(classification, prefix) {
   # ------------------------------------------------------------------
   # 1) Add letters to codes for NACE, NACE 2.1, CPA21, ISIC rev.4
   # ------------------------------------------------------------------
-  if (prefix %in% c("nace2", "nace21", "cpa21", "ISICrev4")) {
+  if (prefix %in% c("nace2", "nace21", "cpa21", "isicrev4")) {
     
-    # Work on the first two digits of the code
     two_digits <- substr(classification$Code, 1, 2)
     
     add_letter <- function(rows, letter) {
@@ -120,13 +118,11 @@ correctionClassification <- function(classification, prefix) {
   classification$Code  <- NULL
   classification$Label <- NULL
   
-  # ------------------------------------------------------------------
   # Detect if any correction was applied
-  # ------------------------------------------------------------------
   corrections_applied <- !identical(classification[[code_col]], original_codes) ||
     nrow(classification) != original_nrow
   
   attr(classification, "corrections_applied") <- corrections_applied
   
-  return(classification)
+  classification
 }

@@ -6,10 +6,6 @@
 #' @param AB A string of the type \code{character} containing the name of a csv file that contains the previous correspondence table A:B.
 #' @param AAStar A string of the type character containing the name of a csv file that contains the \emph{concordance table} A:A*,
 #' which contains the mapping between the codes of the two versions of the classification.
-#' @param CSVout The preferred name for the \emph{output csv files} that will contain the updated correspondence table and
-#' information about the classifications involved. The valid values are \code{NULL} or strings of type \code{character}. If
-#' the selected value is \code{NULL}, the default, no output file is produced. If the value is a string, then the output is
-#' exported into two csv files whose names contain the provided name (see "Value" below).
 #' @param Reference The reference classification among A and B. If a classification is the reference to the other, and
 #' hence \emph{hierarchically superior} to it, each code of the other classification is expected to be mapped to at most one
 #' code of the reference classification. The valid values are \code{"none"}, \code{"A"}, and \code{"B"}. If the selected
@@ -23,6 +19,10 @@
 #' @param Redundancy_trim An argument used to facilitate the trimming of the redundant records. The valid logical values are \code{TRUE} or  \code{FALSE}.
 #' The default value is \code{TRUE}, which removes all redundant records, replacing the values of Acode Alabel and Asupp with the value ‘Multiple’ (to indicate that multiple A records are involved). If the multiple A records are the same, their value will not be replaced. 
 #' The other values is \code{FALSE}, which shows redundant records together with the redundancy flag.
+#' @param CSVout The preferred name for the \emph{output csv files} that will contain the updated correspondence table and
+#' information about the classifications involved. The valid values are \code{NULL} or strings of type \code{character}. If
+#' the selected value is \code{NULL}, the default, no output file is produced. If the value is a string, then the output is
+#' exported into two csv files whose names contain the provided name (see "Value" below).
 #' @export
 #' @details
 #' File and file name requirements:
@@ -168,16 +168,18 @@
 #'  AB <- system.file("extdata", "NAICS2017_NACE.csv", package = "correspondenceTables")
 #'  AAStar <- system.file("extdata", "NAICS2017_NAICS2022.csv", package = "correspondenceTables")
 #'
-#'  UPC <- updateCorrespondenceTable(A,
-#'                                   B,
-#'                                   AStar,
-#'                                   AB,
-#'                                   AAStar,
-#'                                   file.path(tmp_dir,"updateCorrespondenceTable.csv"),
-#'                                   "none",
-#'                                   0.5,
-#'                                   0.3,
-#'                                   FALSE)
+#'   UPC <- updateCorrespondenceTable(
+#'      A = A,
+#'      B = B,
+#'      AStar = AStar,
+#'      AB = AB,
+#'  AAStar = AAStar,
+#'  Reference = "none",
+#'  MismatchToleranceB = 0.5,
+#'  MismatchToleranceAStar = 0.3,
+#'  Redundancy_trim = FALSE,
+#'  CSVout = file.path(tmp_dir, "updateCorrespondenceTable.csv")
+#'           )
 #'
 #'  summary(UPC)
 #'  head(UPC$updateCorrespondenceTable)
@@ -187,7 +189,7 @@
 #'     }
 
 
-updateCorrespondenceTable <- function(A, B, AStar, AB, AAStar, CSVout = NULL, Reference = "none", MismatchToleranceB = 0.2, MismatchToleranceAStar = 0.2, Redundancy_trim = TRUE) {
+updateCorrespondenceTable <- function(A, B, AStar, AB, AAStar,Reference = "none", MismatchToleranceB = 0.2, MismatchToleranceAStar = 0.2, Redundancy_trim = TRUE, CSVout = NULL) {
   
   # Check if files exist in working directory
   # test.names <- as.character(c(A, B, AStar, AB, AAStar))

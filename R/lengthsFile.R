@@ -1,36 +1,36 @@
-#' @title Retrieve correspondence table lengths for each hierarchical level
-#' @description
-#' The aim of this function is to provide a table showing the different
-#' levels of hierarchy for a given classification and the character
-#' positions corresponding to each level within the full code.
+#' Internal helper to derive code segment boundaries by level
 #'
-#' @param endpoint SPARQL endpoint. One of \code{"CELLAR"} or \code{"FAO"}.
-#' @param prefix Prefix identifying the classification in the endpoint
-#'   (e.g. \code{"nace2"}, \code{"cn2022"}).
-#' @param conceptScheme Concept scheme identifier used in the SPARQL calls.
-#' @param correction Logical, \code{TRUE} or \code{FALSE}.
-#'   When \code{TRUE} (default), applies classification-specific
-#'   corrections used in production.
+#' This internal function computes, for a given classification, the character
+#' positions corresponding to each hierarchical level within the compact code
+#' (i.e. without dots and spaces). It is used by higher-level routines and is
+#' not part of the public API.
+#'
+#' @param endpoint Character; SPARQL endpoint. One of \code{"CELLAR"} or
+#'   \code{"FAO"}.
+#' @param prefix Character; prefix identifying the classification in the
+#'   endpoint (e.g. \code{"nace2"}, \code{"cn2022"}).
+#' @param conceptScheme Character; concept scheme identifier used in the
+#'   SPARQL calls.
+#' @param correction Boolean; if \code{TRUE} (default), applies
+#'   classification-specific corrections that are used in production.
 #'
 #' @return A data.frame with two columns:
 #' \itemize{
-#'   \item \code{charb}: starting character position (1-based) of the
-#'         segment corresponding to each hierarchical level (in the
-#'         compact code, without dots/spaces),
-#'   \item \code{chare}: ending character position (1-based) of that
-#'         segment.
+#'   \item \code{charb}: starting character position (1-based) of the segment
+#'         corresponding to each hierarchical level (in the compact code),
+#'   \item \code{chare}: ending character position (1-based) of that segment.
 #' }
 #'
-#' @examples
-#' \dontrun{
-#' endpoint <- "CELLAR"
-#' prefix <- "nace2"
-#' conceptScheme <- "nace2"
-#'
-#' lengthsTable <- lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
-#' head(lengthsTable)
-#' }
+#' @keywords internal
+#' @noRd
 lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
+  # Normalise endpoint / prefix for internal use
+  endpoint <- toupper(endpoint)
+  prefix   <- tolower(prefix)
+  
+  if (!is.logical(correction) || length(correction) != 1L) {
+    stop("`correction` must be a single Boolean value (TRUE or FALSE).")
+  }
   
   ## 1. Retrieve level metadata ---------------------------------------------
   level_dt <- dataStructure(endpoint, prefix, conceptScheme)
@@ -58,7 +58,6 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
                       "cn2021", "cn2022", "cn2023",
                       "cpa21")
   if (!prefix %in% special_prefix) {
-    # on suppose que level_dt[,2] est numérique ou convertible en numérique
     ord <- order(suppressWarnings(as.numeric(level_dt[, 2])))
     level_dt <- level_dt[ord, , drop = FALSE]
   }
@@ -86,7 +85,7 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
       level         = level_ids[l]
     )$ClassificationTable
     
-    # --- Corrections spécifiques (alignées sur ta version de base) ---------
+    # --- Corrections spécifiques -------------------------------------------
     if (isTRUE(correction)) {
       
       # ecoicop: remove ".0" for 10, 11, 12 at the first level only
@@ -108,12 +107,12 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
       # NACE / NACE 2.1 / CPA / ISIC:
       # dans ta version de base, la lettre "A" n'était ajoutée
       # qu'à partir des niveaux > 1
-      if (prefix %in% c("nace2", "nace21", "cpa21", "ISICrev4") && l > 1L) {
+      if (prefix %in% c("nace2", "nace21", "cpa21", "isicrev4") && l > 1L) {
         dt[, 1] <- paste0("A", dt[, 1])
       }
       
       # ICC_v11: add leading zero at level 2 uniquement
-      if (prefix %in% c("ICC_v11") && l == 2L) {
+      if (prefix %in% c("icc_v11") && l == 2L) {
         dt[, 1] <- sprintf("%.2f", dt[, 1])
       }
     }
@@ -124,8 +123,6 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
     
     len_unique <- unique(nchar(codes_clean))
     
-    # Si les longueurs ne sont pas homogènes à ce niveau → impossible de
-    # déterminer un segment propre, on met NA et on avertit.
     if (length(len_unique) != 1L || is.na(len_unique[1L])) {
       total_len[l] <- NA_integer_
       charb[l]     <- NA_integer_
@@ -141,11 +138,9 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
       total_len[l] <- len_unique[1L]
       
       if (l == 1L) {
-        # Premier niveau : commence au premier caractère
         charb[l] <- 1L
         chare[l] <- total_len[l]
       } else {
-        # Niveaux suivants : segment = différence de longueur totale
         if (is.na(total_len[l - 1L]) || total_len[l] <= total_len[l - 1L]) {
           charb[l] <- NA_integer_
           chare[l] <- NA_integer_
@@ -158,9 +153,9 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
           )
           
         } else {
-          seg_len <- total_len[l] - total_len[l - 1L]
-          charb[l] <- chare[l - 1L] + 1L
-          chare[l] <- chare[l - 1L] + seg_len
+          seg_len   <- total_len[l] - total_len[l - 1L]
+          charb[l]  <- chare[l - 1L] + 1L
+          chare[l]  <- chare[l - 1L] + seg_len
         }
       }
     }
@@ -188,5 +183,5 @@ lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
     )
   }
   
-  return(lengths)
+  lengths
 }

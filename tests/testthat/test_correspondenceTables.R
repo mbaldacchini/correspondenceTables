@@ -4,9 +4,18 @@ AStar = system.file("extdata/test", "NACE21.csv", package = "correspondenceTable
 B = system.file("extdata/test", "CPA.csv", package = "correspondenceTables")
 AB = system.file("extdata/test", "NACECPA.csv", package = "correspondenceTables")
 AAStar = system.file("extdata/test", "NACE221.csv", package = "correspondenceTables")
-
-CT_nullT = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "A", 0.4, 0.4, FALSE)
-
+CT_nullT = updateCorrespondenceTable(
+  A, 
+  B, 
+  AStar, 
+  AB, 
+  AAStar, 
+  Reference = "A",
+  MismatchToleranceB = 0.4,
+  MismatchToleranceAStar = 0.4,
+  Redundancy_trim = FALSE,
+  CSVout = NULL
+)
 Ctext_nullT = system.file("extdata/test", "LblYY.csv", package = "correspondenceTables")
 Ctext_nullT = utils::read.csv(Ctext_nullT, sep = ",", header = TRUE, check.names = FALSE, colClasses = c("character"), encoding = "UTF-8")
 
@@ -19,7 +28,7 @@ Bno = system.file("extdata/test", "CPA.csv", package = "correspondenceTables")
 ABno = system.file("extdata/test", "NACECPA.csv", package = "correspondenceTables")
 AAStarno = system.file("extdata/test", "NACE221.csv", package = "correspondenceTables")
 
-CT_nullTno = updateCorrespondenceTable(Ano, Bno, AStarno, ABno, AAStarno, NULL, "A", 0.4, 0.4, FALSE)
+CT_nullTno = updateCorrespondenceTable(Ano, Bno, AStarno, ABno, AAStarno, "A", 0.4, 0.4, FALSE)
 
 Ctext_nullTno = system.file("extdata/test", "LblNY.csv", package = "correspondenceTables")
 Ctext_nullTno = utils::read.csv(Ctext_nullTno, sep = ",", header = TRUE, check.names = FALSE, colClasses = c("character"), encoding = "UTF-8")
@@ -34,7 +43,7 @@ B = system.file("extdata/test", "UcaseB.csv", package = "correspondenceTables")
 AB = system.file("extdata/test", "UcaseAB.csv", package = "correspondenceTables")
 AAStar = system.file("extdata/test", "UcaseAAstar.csv", package = "correspondenceTables")
 
-UCT = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "B", 0.8, 0.8, FALSE)
+UCT = updateCorrespondenceTable(A, B, AStar, AB, AAStar, "B", 0.8, 0.8, FALSE)
 UCT[[1]]$sort = 1:nrow(UCT[[1]])
 
 UTC_T = system.file("extdata/test", "nomatch_test.csv", package = "correspondenceTables")
@@ -62,14 +71,14 @@ B = system.file("extdata/test", "CPA_Red.csv", package = "correspondenceTables")
 AB = system.file("extdata/test", "NACECPA_Red.csv", package = "correspondenceTables")
 AAStar = system.file("extdata/test", "NACE221_Red.csv", package = "correspondenceTables")
 
-CT_nullT = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "none", 0.4, 0.4, TRUE)
-CT_nullS = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "none", 0.4, 0.4, FALSE)
+CT_nullT = updateCorrespondenceTable(A, B, AStar, AB, AAStar,  "none", 0.4, 0.4, TRUE)
+CT_nullS = updateCorrespondenceTable(A, B, AStar, AB, AAStar,  "none", 0.4, 0.4, FALSE)
 
-CT_AT = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "A", 0.4, 0.4, TRUE)
-CT_AS = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "A", 0.4, 0.4, FALSE)
+CT_AT = updateCorrespondenceTable(A, B, AStar, AB, AAStar,  "A", 0.4, 0.4, TRUE)
+CT_AS = updateCorrespondenceTable(A, B, AStar, AB, AAStar,  "A", 0.4, 0.4, FALSE)
 
-CT_BT = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "B", 0.4, 0.4, TRUE)
-CT_BS = updateCorrespondenceTable(A, B, AStar, AB, AAStar, NULL, "B", 0.4, 0.4, FALSE)
+CT_BT = updateCorrespondenceTable(A, B, AStar, AB, AAStar,  "B", 0.4, 0.4, TRUE)
+CT_BS = updateCorrespondenceTable(A, B, AStar, AB, AAStar,  "B", 0.4, 0.4, FALSE)
 
 Ctext_nullT = system.file("extdata/test", "LblYY_RednullTrim.csv", package = "correspondenceTables")
 Ctext_nullT = utils::read.csv(Ctext_nullT, sep = ",", header = TRUE, check.names = FALSE, colClasses = c("character"), encoding = "UTF-8")
@@ -153,3 +162,4 @@ TEST2_T = TEST2_T[order(as.numeric(TEST2_T$sort)),]
 expect_equal(test[,15], TEST2_T[,13])
 
 file.remove(file.path(dir,"names.csv"))
+
