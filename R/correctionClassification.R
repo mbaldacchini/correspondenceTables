@@ -1,101 +1,132 @@
-#' @title Retrieve classification table from CELLAR and FAO repositories. 
-#' @description The aim of this function is to provide a table showing the different codes and labels for each classification 
-#' @param classification it returns a dataframe with two columns corrected according to the classification of CELLAR & FAO.
-#' @export
-#' @return
-#'  \code{correctionClassification()} returns a table with information needed to retrieve the classification table:
-#'  \itemize{
-#'    \item Classification Code name (e.g. nace2): the code of each object
-#'    \item Classification Label:  corresponding name of each object
-#'  }
-#' @examples
-#' {
-#' prefix = "nace2"
-#' conceptScheme = "nace2"
-#' endpoint = "CELLAR"
-#' classification = retrieveClassificationTable(prefix, endpoint, conceptScheme, level="ALL")$ClassificationTable
-#' correct_classification = correctionClassification(classification)
-#' View(correct_classification)
-#' }
+#' Internal helper to correct raw classification tables
+#'
+#' This function applies a set of prefix-specific correction rules to a
+#' classification table (e.g. from CELLAR or FAO). It is for internal use only
+#' and is not part of the public API.
+#'
+#' @keywords internal
+#' @noRd
+correctionClassification <- function(classification, prefix) {
+  ...
+}
 
-
-correctionClassification = function(classification){
+correctionClassification <- function(classification, prefix) {
+  # Basic checks on inputs
+  if (!is.data.frame(classification)) {
+    stop("`classification` must be a data.frame.")
+  }
+  
+  if (missing(prefix) || !is.character(prefix) || length(prefix) != 1L) {
+    stop("`prefix` must be a single character string (e.g. 'nace2', 'cn2022').")
+  }
+  
+  # Identify code and label columns:
+  # - code column is assumed to be named as the prefix (e.g. "cn2022")
+  # - label column is assumed to be "Name"
+  code_col  <- prefix
+  label_col <- "Name"
+  
+  if (!(code_col %in% colnames(classification))) {
+    stop(paste0("Column '", code_col, "' not found in `classification`."))
+  }
+  
+  if (!(label_col %in% colnames(classification))) {
+    stop("Column 'Name' not found in `classification`.")
+  }
+  
+  # Save original codes and number of rows to detect corrections later
+  original_codes <- classification[[code_col]]
+  original_nrow  <- nrow(classification)
+  
+  # Create normalized temporary columns for internal processing
+  classification$Code  <- classification[[code_col]]
+  classification$Label <- classification[[label_col]]
+  
+  # ------------------------------------------------------------------
+  # 1) Add letters to codes for NACE, NACE 2.1, CPA21, ISIC rev.4
+  # ------------------------------------------------------------------
+  if (prefix %in% c("nace2", "nace21", "cpa21", "ISICrev4")) {
     
-    if(ncol(classification) != 2){
-        stop("The classification must have only two colums corresponding to code and label.")
+    # Work on the first two digits of the code
+    two_digits <- substr(classification$Code, 1, 2)
+    
+    add_letter <- function(rows, letter) {
+      if (length(rows) > 0L) {
+        classification$Code[rows] <<- paste0(letter, classification$Code[rows])
+      }
     }
     
-    colnames(classification)[1:2] = c("Code", "Label")
-    
-    #add letter to code (for NACE - NACE 2.1 - CPA21 - and ISIC)
-    if (prefix %in% c("nace2", "nace21", "cpa21", "ISICrev4")) {
-        A_code = which(substr(classification$Code, 1, 2) %in% c("01", "02", "03"))
-        classification$Code[A_code] = paste0("A", classification$Code[A_code])
-        B_code = which(substr(classification$Code, 1, 2) %in% c("05", "06", "07", "08", "09"))
-        classification$Code[B_code] = paste0("B", classification$Code[B_code])
-        C_code = which(substr(classification$Code, 1, 2) %in% c("10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", 
-                                                                "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"))
-        classification$Code[C_code] = paste0("C", classification$Code[C_code])
-        D_code = which(substr(classification$Code, 1, 2) %in% c("35"))
-        classification$Code[D_code] = paste0("D", classification$Code[D_code])
-        E_code = which(substr(classification$Code, 1, 2) %in% c("36", "37", "38", "39"))
-        classification$Code[E_code] = paste0("E", classification$Code[E_code])
-        F_code = which(substr(classification$Code, 1, 2) %in% c("41", "42", "43"))
-        classification$Code[F_code] = paste0("F", classification$Code[F_code])
-        G_code = which(substr(classification$Code, 1, 2) %in% c("45", "46", "47"))
-        classification$Code[G_code] = paste0("G", classification$Code[G_code])
-        H_code = which(substr(classification$Code, 1, 2) %in% c("49", "50", "51", "52", "53"))
-        classification$Code[H_code] = paste0("H", classification$Code[H_code])
-        I_code = which(substr(classification$Code, 1, 2) %in% c("55", "56"))
-        classification$Code[I_code] = paste0("I", classification$Code[I_code])
-        J_code = which(substr(classification$Code, 1, 2) %in% c("58", "59", "60", "61", "62", "63"))
-        classification$Code[J_code] = paste0("J", classification$Code[J_code])
-        K_code = which(substr(classification$Code, 1, 2) %in% c("64", "65", "66"))
-        classification$Code[K_code] = paste0("K", classification$Code[K_code])
-        L_code = which(substr(classification$Code, 1, 2) %in% c("68"))
-        classification$Code[L_code] = paste0("L", classification$Code[L_code])
-        M_code = which(substr(classification$Code, 1, 2) %in% c("69", "70", "71", "72", "73", "74", "75"))
-        classification$Code[M_code] = paste0("M", classification$Code[M_code])
-        N_code = which(substr(classification$Code, 1, 2) %in% c("77", "78", "79", "80", "81", "82"))
-        classification$Code[N_code] = paste0("N", classification$Code[N_code])
-        O_code = which(substr(classification$Code, 1, 2) %in% c("84"))
-        classification$Code[O_code] = paste0("O", classification$Code[O_code])
-        P_code = which(substr(classification$Code, 1, 2) %in% c("85"))
-        classification$Code[P_code] = paste0("P", classification$Code[P_code])
-        Q_code = which(substr(classification$Code, 1, 2) %in% c("86", "87", "88"))
-        classification$Code[Q_code] = paste0("Q", classification$Code[Q_code])
-        R_code = which(substr(classification$Code, 1, 2) %in% c("90", "91", "92", "93"))
-        classification$Code[R_code] = paste0("R", classification$Code[R_code])
-        S_code = which(substr(classification$Code, 1, 2) %in% c("94", "95", "96"))
-        classification$Code[S_code] = paste0("S", classification$Code[S_code])
-        T_code = which(substr(classification$Code, 1, 2) %in% c("97", "98"))
-        classification$Code[T_code] = paste0("T", classification$Code[T_code])
-        U_code = which(substr(classification$Code, 1, 2) %in% c("99"))
-        classification$Code[U_code] = paste0("U", classification$Code[U_code])
+    add_letter(which(two_digits %in% c("01","02","03")), "A")
+    add_letter(which(two_digits %in% c("05","06","07","08","09")), "B")
+    add_letter(which(two_digits %in% sprintf("%02d", 10:33)), "C")
+    add_letter(which(two_digits == "35"), "D")
+    add_letter(which(two_digits %in% c("36","37","38","39")), "E")
+    add_letter(which(two_digits %in% c("41","42","43")), "F")
+    add_letter(which(two_digits %in% c("45","46","47")), "G")
+    add_letter(which(two_digits %in% c("49","50","51","52","53")), "H")
+    add_letter(which(two_digits %in% c("55","56")), "I")
+    add_letter(which(two_digits %in% c("58","59","60","61","62","63")), "J")
+    add_letter(which(two_digits %in% c("64","65","66")), "K")
+    add_letter(which(two_digits == "68"), "L")
+    add_letter(which(two_digits %in% c("69","70","71","72","73","74","75")), "M")
+    add_letter(which(two_digits %in% c("77","78","79","80","81","82")), "N")
+    add_letter(which(two_digits == "84"), "O")
+    add_letter(which(two_digits == "85"), "P")
+    add_letter(which(two_digits %in% c("86","87","88")), "Q")
+    add_letter(which(two_digits %in% c("90","91","92","93")), "R")
+    add_letter(which(two_digits %in% c("94","95","96")), "S")
+    add_letter(which(two_digits %in% c("97","98")), "T")
+    add_letter(which(two_digits == "99"), "U")
+  }
+  
+  # ------------------------------------------------------------------
+  # 2) ECOICOP: remove trailing ".0" for main groups 10.0, 11.0, 12.0
+  # ------------------------------------------------------------------
+  if (prefix == "ecoicop") {
+    idx <- which(classification$Code %in% c("10.0", "11.0", "12.0"))
+    classification$Code[idx] <- c("10", "11", "12")
+  }
+  
+  # ------------------------------------------------------------------
+  # 3) PRODCOM 2019: remove weird codes "00.99.t" and "00.99.z"
+  # ------------------------------------------------------------------
+  if (prefix == "prodcom2019") {
+    weird <- which(classification$Code %in% c("00.99.t", "00.99.z"))
+    if (length(weird) > 0L) {
+      classification <- classification[-weird, , drop = FALSE]
     }
-    
-    #remove .0 for 10, 11 and 12 division (for ecoicop) --- THIS WAS CHANGED (but not for hicp)
-    if (prefix %in% c("ecoicop")) {
-        level1_code = which(classification$Code %in% c("10.0", "11.0", "12.0"))
-        classification$Code[level1_code] = c("10", "11", "12") 
-    }
-    
-    #remove weird code 00.99.t and 00.99.t (for prodcom2019)
-    if (prefix %in% c("prodcom2019")) {
-        level1_code = which(classification$Code %in% c("00.99.t", "00.99.z"))
-        classification = classification[-level1_code,]
-    }
-    
-    #remove section (for CN) - does not need correction NO SECTION
-    if (prefix %in% c("cn2017", "cn2018", "cn2019", "cn2020", "cn2021", "cn2021", "cn2022", "cn2023")) {
-        level1_code = which(gsub("[^a-zA-Z]", "", classification$Code)!= "")
-        classification = classification[-level1_code,]
-    }
-    
-    #remove . in the end of the code (for CBF)
-    if (prefix %in% c("cbf10")) {
-        classification[,1] = substr(classification[,1], 1, nchar(classification[,1])-1)
-    }
-    
-    return(classification)
+  }
+  
+  # ------------------------------------------------------------------
+  # 4) CN classifications: remove section rows (codes containing letters)
+  # ------------------------------------------------------------------
+  if (prefix %in% c("cn2017","cn2018","cn2019","cn2020",
+                    "cn2021","cn2022","cn2023")) {
+    has_letters <- grepl("[A-Za-z]", classification$Code)
+    classification <- classification[!has_letters, , drop = FALSE]
+  }
+  
+  # ------------------------------------------------------------------
+  # 5) CBF: remove trailing "." from the code (if present)
+  # ------------------------------------------------------------------
+  if (prefix == "cbf10") {
+    classification$Code <- sub("\\.$", "", classification$Code)
+  }
+  
+  # Write the corrected code back into the original code column
+  classification[[code_col]] <- classification$Code
+  
+  # Drop internal helper columns
+  classification$Code  <- NULL
+  classification$Label <- NULL
+  
+  # ------------------------------------------------------------------
+  # Detect if any correction was applied
+  # ------------------------------------------------------------------
+  corrections_applied <- !identical(classification[[code_col]], original_codes) ||
+    nrow(classification) != original_nrow
+  
+  attr(classification, "corrections_applied") <- corrections_applied
+  
+  return(classification)
 }

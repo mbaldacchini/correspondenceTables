@@ -2,24 +2,33 @@
 % Please edit documentation in R/correspondenceList.R
 \name{correspondenceList}
 \alias{correspondenceList}
-\title{Overview of all the available correspondence classification from CELLAR and FAO repository.}
+\title{Overview of available correspondence tables (deprecated wrapper)}
 \usage{
 correspondenceList(endpoint)
 }
 \arguments{
-\item{endpoint}{SPARQL endpoints provide a standardized way to access data sets, 
-making it easier to retrieve specific information or perform complex queries on linked data. 
-The valid values are \code{"CELLAR"}, \code{"FAO"} or \code{"ALL"} for both.}
+\item{endpoint}{Character. SPARQL endpoint(s) to query. Valid values are
+\code{"CELLAR"}, \code{"FAO"} or \code{"ALL"}.}
 }
 \value{
-\code{correspondenceList()} returns a list of the correspondence tables available with prefix name, ID, Source classification, 
-Target classification, Table name and URI.
+The same object as returned by
+\code{correspondenceTableList(endpoint = endpoint)}.
 }
 \description{
-Provides an overview of all the available correspondence classification from CELLAR and FAO repository.
+This function is deprecated and kept only for backward compatibility.
+Users should now use \code{correspondenceTableList()} instead.
 }
+\section{Deprecated}{
+
+This function is deprecated. It is now a thin wrapper around
+\code{correspondenceTableList()} and will be removed in a future release.
+}
+
 \examples{
-{
-    corr_list = correspondenceList("ALL")
-    }
+\dontrun{
+# Deprecated: please use correspondenceTableList() instead.
+corr_list <- correspondenceList("ALL")
+print(corr_list)
+}
+
 }

@@ -6,6 +6,15 @@
 \usage{
 classificationList(endpoint = "ALL", showQuery = FALSE)
 }
+\arguments{
+\item{endpoint}{Character string indicating which repository to query.
+Must be one of \code{"CELLAR"}, \code{"FAO"} or \code{"ALL"} (the latter
+queries both repositories and returns a named list).}
+
+\item{showQuery}{Logical; if \code{TRUE}, the function returns, in addition
+to the classification list, the SPARQL query (or queries) used to produce
+the result. Defaults to \code{FALSE}.}
+}
 \value{
 If \code{endpoint} is \code{"CELLAR"} or \code{"FAO"} and
 \code{showQuery = FALSE}, the function returns a data frame with the
@@ -81,15 +90,26 @@ pre-computed CSV data for the requested endpoint(s). This allows vignettes
 to be built reproducibly and without network access.
 }
 \examples{
-\donttest{
-# Example 1: default behaviour (live query — requires internet)
-# head(classificationList("CELLAR"))
-
-# Example 2: offline mode using embedded CSVs
+# --- Offline mode (uses embedded CSVs, no internet required) ---
+old_opt <- getOption("useLocalDataForVignettes")
 options(useLocalDataForVignettes = TRUE)
+
+# List of available classification schemes in CELLAR (offline)
+head(classificationList("CELLAR"))
+
+# List of available classification schemes in FAO (offline)
 head(classificationList("FAO"))
 
-# Example 3: retrieve SPARQL query for debugging
+# Restore previous option
+options(useLocalDataForVignettes = old_opt)
+
+\dontrun{
+# --- Online examples (live SPARQL, requires internet connection) ---
+
+# Direct query on CELLAR
+head(classificationList("CELLAR"))
+
+# Retrieve SPARQL query for debugging
 res <- classificationList("CELLAR", showQuery = TRUE)
 names(res)
 }

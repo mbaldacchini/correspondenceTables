@@ -2,46 +2,44 @@
 % Please edit documentation in R/lengthsFile.R
 \name{lengthsFile}
 \alias{lengthsFile}
-\title{Retrieve correspondance tables lenghts for each level tables between classification from CELLAR and FAO repositories}
+\title{Retrieve correspondence table lengths for each hierarchical level}
 \usage{
 lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
 }
 \arguments{
-\item{endpoint}{SPARQL endpoints provide a standardized way to access data sets, 
-making it easier to retrieve specific information or perform complex queries on linked data.
-The valid values are \code{"CELLAR"} or \code{"FAO"}.}
+\item{endpoint}{SPARQL endpoint. One of \code{"CELLAR"} or \code{"FAO"}.}
 
-\item{prefix}{Prefixes are typically defined at the beginning of a SPARQL query 
-and are used throughout the query to make it more concise and easier to read. 
-Multiple prefixes can be defined in a single query to cover different namespaces used in the dataset.
-The function 'classEndpoint()' can be used to generate the prefixes for the selected correspondence table.}
+\item{prefix}{Prefix identifying the classification in the endpoint
+(e.g. \code{"nace2"}, \code{"cn2022"}).}
 
-\item{conceptScheme}{Refers to a unique identifier associated to specific classification table. 
-The conceptScheme can be obtained by utilizing the "classEndpoint()" function.}
+\item{conceptScheme}{Concept scheme identifier used in the SPARQL calls.}
 
-\item{correction}{The valid values are \code{FALSE} or \code{TRUE}. In both cases the lengths table as an R object.
-If the output wants to have a correction for hierarchy levels \code{TRUE}. By default is set to "TRUE".}
+\item{correction}{Logical, \code{TRUE} or \code{FALSE}.
+When \code{TRUE} (default), applies classification-specific
+corrections used in production.}
 }
 \value{
-\code{lenghtsFile()} returns a table containing the lengths for each hierarchical level of the classification.
-   \itemize{
-      \item charb: contains the length for each code for each hierarchical level
-      \item chare: contains the concatenated length of char b for each code for each hierarchical level
+A data.frame with two columns:
+\itemize{
+  \item \code{charb}: starting character position (1-based) of the
+        segment corresponding to each hierarchical level (in the
+        compact code, without dots/spaces),
+  \item \code{chare}: ending character position (1-based) of that
+        segment.
 }
 }
 \description{
-The aim of this function is to provide a table showing the different levels of hierarchy for each classification and the length of each level.
+The aim of this function is to provide a table showing the different
+levels of hierarchy for a given classification and the character
+positions corresponding to each level within the full code.
 }
 \examples{
-{
-endpoint = "CELLAR"
-prefix = "nace2"
-conceptScheme = "nace2"
+\dontrun{
+endpoint <- "CELLAR"
+prefix <- "nace2"
+conceptScheme <- "nace2"
 
-lengthsTable = lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
-
-#View lengthsTable
-View(lengthsTable)
-
-} 
+lengthsTable <- lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
+head(lengthsTable)
+}
 }

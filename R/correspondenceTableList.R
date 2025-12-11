@@ -1,7 +1,14 @@
 #' @title Retrieve a list of all correspondence tables in the CELLAR and FAO repositories
-#' @description List all correspondence tables in the CELLAR of FAO repositories
+#'
+#' @description
+#' List all correspondence tables in the CELLAR or FAO repositories.
+#'
 #' @param endpoint Character. SPARQL endpoint(s) to query. Valid values are:
-#' \code{"CELLAR"}, \code{"FAO"}, or \code{"ALL"} (default).
+#'   \code{"CELLAR"}, \code{"FAO"}, or \code{"ALL"} (default).
+#'
+#' @param showQuery Logical; if \code{TRUE}, the SPARQL query used for each
+#'   prefix is printed (and can be inspected by the user). This is mainly
+#'   intended for debugging or reproducibility. Default is \code{FALSE}.
 #'
 #' @return
 #' If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
@@ -13,12 +20,17 @@
 #'   \item Table Name
 #'   \item URI
 #' }
-#' If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s: one for each endpoint.
+#' If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s:
+#' one for each endpoint.
 #'
 #' @details
-#' The behaviour of this function is contingent on the global option \code{useLocalDataForVignettes}:
-#' The default behaviour (when the option is not set, or set to something else than \code{TRUE}), is that is queries live SPARQL endpoints online.
-#' When the option is set to \code{TRUE} via \code{options(useLocalDataForVignettes = TRUE)}, the function returns local (embedded) data instead of querying live SPARQL endpoints.
+#' The behaviour of this function is contingent on the global option
+#' \code{useLocalDataForVignettes}:
+#' the default behaviour (when the option is not set, or set to something else
+#' than \code{TRUE}), is that it queries live SPARQL endpoints online.
+#' When the option is set to \code{TRUE} via
+#' \code{options(useLocalDataForVignettes = TRUE)}, it may return local
+#' (embedded) data instead of querying live SPARQL endpoints.
 #' This is useful for building vignettes or offline testing.
 #'
 #' @import httr
@@ -29,30 +41,35 @@
 #' if (interactive()) {
 #'   # Retrieve list of all available correspondence tables
 #'   corr_list <- correspondenceTableList("ALL")
-#'   View(corr_list)
+#'   print(corr_list)
 #' }
-
-
-correspondenceTableList <- function(endpoint) {
+correspondenceTableList <- function(endpoint, showQuery = FALSE) {
   endpoint <- toupper(endpoint)
   if (!(endpoint %in% c("ALL", "FAO", "CELLAR"))) {
     stop(simpleError(paste("The endpoint value:", endpoint, "is not accepted")))
   }
   
+  # If ALL: call recursively for both endpoints, propagating showQuery
   if (endpoint == "ALL") {
     return(list(
-      CELLAR = correspondenceTableList("CELLAR"),
-      FAO = correspondenceTableList("FAO")
+      CELLAR = correspondenceTableList("CELLAR", showQuery = showQuery),
+      FAO    = correspondenceTableList("FAO",    showQuery = showQuery)
     ))
   }
   
-  config <- fromJSON("https://raw.githubusercontent.com/eurostat/correspondenceTables/refs/heads/main/inst/extdata/endpoint_source_config.json")
+  config <- fromJSON(
+    "https://raw.githubusercontent.com/eurostat/correspondenceTables/refs/heads/main/inst/extdata/endpoint_source_config.json"
+  )
   source <- config[[endpoint]]
   sep <- ifelse(endpoint == "CELLAR", "_", "-")
   rm <- 1:16
   
   prefixlist_raw <- prefixList(endpoint)
-  prefixlist_raw <- gsub("PREFIX FPC&D2022: <https://stats.fao.org/classifications/FPC&D2022/>", "", prefixlist_raw)
+  prefixlist_raw <- gsub(
+    "PREFIX FPC&D2022: <https://stats.fao.org/classifications/FPC&D2022/>",
+    "",
+    prefixlist_raw
+  )
   prefix_header <- as.character(paste(prefixlist_raw, collapse = "\n"))
   
   prefixes_loop <- unlist(lapply(strsplit(as.character(prefixList(endpoint)), " "), function(x) x[2]))
@@ -69,7 +86,8 @@ correspondenceTableList <- function(endpoint) {
     }
     
     tryCatch({
-      SPARQL.query <- paste0(prefix_header, "
+      SPARQL.query <- paste0(
+        prefix_header, "
         SELECT ?ID_table ?A ?B ?Table ?URL 
         WHERE {
           ?s a xkos:Correspondence ;
@@ -81,9 +99,20 @@ correspondenceTableList <- function(endpoint) {
           BIND (STRBEFORE(STR(?ID_table), '", sep, "') AS ?A)
           FILTER (STRLEN(?ID_table) != 0)
         }
-      ")
+      "
+      )
       
-      response <- httr::POST(url = source, accept("text/csv"), body = list(query = SPARQL.query), encode = "form")
+      if (isTRUE(showQuery)) {
+        message("SPARQL query for endpoint = ", endpoint,
+                ", prefix = ", prefix, ":\n", SPARQL.query)
+      }
+      
+      response <- httr::POST(
+        url   = source,
+        accept("text/csv"),
+        body  = list(query = SPARQL.query),
+        encode = "form"
+      )
       df <- read.csv(text = content(response, "text"), stringsAsFactors = FALSE)
       
       if (nrow(df) == 0) {
@@ -97,7 +126,12 @@ correspondenceTableList <- function(endpoint) {
       
     }, error = function(e) {
       message("The following SPARQL code was used:\n", SPARQL.query)
-      stop(simpleError(paste0("Error in function correspondenceTableList(", endpoint, "), endpoint not available or returned unexpected data.")))
+      stop(simpleError(
+        paste0(
+          "Error in function correspondenceTableList(", endpoint,
+          "), endpoint not available or returned unexpected data."
+        )
+      ))
     })
   }
   

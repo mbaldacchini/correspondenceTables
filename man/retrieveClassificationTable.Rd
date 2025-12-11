@@ -2,7 +2,7 @@
 % Please edit documentation in R/retrieveClassificationTable.R
 \name{retrieveClassificationTable}
 \alias{retrieveClassificationTable}
-\title{Retrieve classifications and correspondence tables stored as Linked Open Data}
+\title{Retrieve a classification table from CELLAR or FAO}
 \usage{
 retrieveClassificationTable(
   endpoint,
@@ -11,55 +11,139 @@ retrieveClassificationTable(
   language = "en",
   level = "ALL",
   CSVout = NULL,
-  showQuery = TRUE,
+  showQuery = FALSE,
   localData = NULL
 )
 }
 \arguments{
-\item{endpoint}{Character. SPARQL endpoint to query. Valid values: \code{"CELLAR"} or \code{"FAO"}.}
+\item{endpoint}{Character string specifying which SPARQL endpoint to query.
+Must be one of:
+\itemize{
+  \item \code{"CELLAR"}
+  \item \code{"FAO"}
+}}
 
-\item{prefix}{The namespace prefix identifying the classification. You can retrieve available prefixes using the \code{classificationList()} function.}
+\item{prefix}{Character string giving the namespace prefix associated
+with the targeted classification scheme.  
+This value should match the \code{Prefix} column returned by
+\code{\link{classificationEndpoint}} and is required to build:
+\itemize{
+  \item the \code{PREFIX} declarations (via \code{prefixList}),
+  \item the fully-qualified scheme name (e.g. \code{prefix:conceptScheme}).
+}}
 
-\item{conceptScheme}{Character. Unique identifier associated with a specific classification table.}
+\item{conceptScheme}{Character string identifying the classification
+scheme to retrieve, typically obtained from the
+\code{ConceptScheme} column of \code{\link{classificationEndpoint}}.}
 
-\item{language}{Character. Language for labels, includes, and excludes. Default: \code{"en"}.}
+\item{language}{Character string giving the language used for labels and
+notes. Defaults to \code{"en"}.}
 
-\item{level}{Character. Level to retrieve in a hierarchical classification. Default is \code{"ALL"}.}
+\item{level}{Character string specifying which hierarchical level to
+retrieve.  
+\itemize{
+  \item \code{"ALL"} (default): retrieve every level.
+  \item A numeric depth (e.g. \code{"1"}, \code{"2"}): retrieve only
+        that level.
+}
+If the classification has no defined levels (as detected by
+\code{\link{dataStructure}}), the function automatically resets
+\code{level = "ALL"} with a message.}
 
-\item{CSVout}{Logical or character. If \code{TRUE}, saves the table to a default CSV file. If a file path is provided, saves to that file.
-Default is \code{NULL} (no file is saved).}
+\item{CSVout}{Logical or character. Controls CSV export:
+\itemize{
+  \item \code{NULL} (default): no export.
+  \item \code{TRUE}: export to a default filename based on
+        \code{prefix} and \code{language}.
+  \item character: explicit path to a CSV file.
+}}
 
-\item{showQuery}{Logical. If \code{TRUE}, returns the SPARQL query used along with the data. Default is \code{TRUE}.}
+\item{showQuery}{Logical. If \code{TRUE} (default), returns a list
+containing both the SPARQL query and the resulting table.  
+If \code{FALSE}, only the table (data frame) is returned.}
 
-\item{localData}{Logical. If \code{TRUE}, retrieves internal (local) data rather than live SPARQL results. Default: \code{FALSE}.}
+\item{localData}{Logical (reserved for future use).
+When the global option \code{useLocalDataForVignettes = TRUE} is set,
+the function attempts to read an embedded CSV file instead of querying
+the live endpoints.}
 }
 \value{
-A list (if \code{showQuery = TRUE}) with the SPARQL query and the correspondence table, or just the table otherwise.
+If \code{showQuery = TRUE} (default), returns a list with:
+\itemize{
+  \item \code{SPARQL.query}: the full SPARQL query as a character string,
+  \item \code{ClassificationTable}: a data frame containing the retrieved
+        classification table.
+}
+
+If \code{showQuery = FALSE}, only the classification table is returned.
 }
 \description{
-Retrieve correspondence tables from the CELLAR and FAO repositories.
+Retrieves a full classification table codes, labels, hierarchical
+relationships, and associated notes from the CELLAR or FAO SPARQL
+repositories.  
+The function supports optional filtering by hierarchical level and
+automatic use of local embedded data for vignette building.
 }
 \details{
-The behaviour of this function is contingent on the global option \code{useLocalDataForVignettes}:
-The default behaviour (when the option is not set, or set to something else than \code{TRUE}), is that is queries live SPARQL endpoints online.
-When the option is set to \code{TRUE} via \code{options(useLocalDataForVignettes = TRUE)}, the function returns local (embedded) data instead of querying live SPARQL endpoints.
-This is useful for building vignettes or offline testing.
+Behaviour depends on the global option
+\code{useLocalDataForVignettes}:
+\itemize{
+  \item If \code{TRUE}:  
+        the function searches for a local embedded CSV file (in
+        \code{inst/extdata}) matching the requested \code{prefix} and
+        \code{language}.  
+        If found, it is returned immediately and no SPARQL call is made.
+
+  \item If \code{FALSE}:  
+        the function:
+        \itemize{
+          \item builds SPARQL prefix declarations via
+                \code{prefixList},
+          \item calls \code{\link{dataStructure}} to determine level
+                availability and adjust \code{level} when necessary,
+          \item constructs and submits a SPARQL query to the selected
+                endpoint,
+          \item returns the resulting classification table, optionally
+                along with the query used.
+        }
+}
+
+Clear, user-friendly errors are raised if:
+\itemize{
+  \item the endpoint is unreachable,
+  \item the classification does not provide the requested level,
+  \item \code{dataStructure()} indicates missing or invalid structure information,
+  \item the SPARQL response is malformed.
+}
 }
 \examples{
-# \dontrun{
-endpoint <- "CELLAR"
-prefix <- "cn2022"
-ID_table <- "CN2022_NST2007"
-result <- tryCatch({
-  retrieveCorrespondenceTable(endpoint, prefix, ID_table)
-}, error = function(e) {
-  message("SPARQL query failed: ", e$message)
-  NULL
-})
+\dontrun{
+  endpoint <- "CELLAR"
+  prefix <- "cn2022"
+  conceptScheme <- "cn2022"
 
-if (!is.null(result)) {
-  cat(result[[1]])      # Show SPARQL query
-  head(result[[2]])     # Show top of result table
+  res <- tryCatch(
+    retrieveClassificationTable(
+      endpoint      = endpoint,
+      prefix        = prefix,
+      conceptScheme = conceptScheme,
+      language      = "en",
+      level         = "ALL"
+    ),
+    error = function(e) {
+      message("SPARQL query failed: ", e$message)
+      NULL
+    }
+  )
+
+  if (!is.null(res)) {
+    cat(res$SPARQL.query)
+    head(res$ClassificationTable)
+  }
 }
-# }
+
+}
+\seealso{
+\code{\link{classificationEndpoint}},
+\code{\link{dataStructure}}
 }

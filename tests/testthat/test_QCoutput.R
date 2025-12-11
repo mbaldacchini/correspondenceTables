@@ -1,3 +1,5 @@
+testthat::skip("classificationQC disabled in version 0.10.29")
+
 # Test 1 - classificationQC() works with real NACE example
 test_that("[1] classificationQC() works with real NACE example", {
   classification_file <- system.file("extdata", "Nace2.csv", package = "correspondenceTables")

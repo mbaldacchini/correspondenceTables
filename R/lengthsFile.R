@@ -1,145 +1,192 @@
-#' @title Retrieve correspondance tables lenghts for each level tables between classification from CELLAR and FAO repositories
-#' @description The aim of this function is to provide a table showing the different levels of hierarchy for each classification and the length of each level.   
-#' @param endpoint SPARQL endpoints provide a standardized way to access data sets, 
-#' making it easier to retrieve specific information or perform complex queries on linked data.
-#' The valid values are \code{"CELLAR"} or \code{"FAO"}. 
-#' @param  prefix Prefixes are typically defined at the beginning of a SPARQL query 
-#' and are used throughout the query to make it more concise and easier to read. 
-#' Multiple prefixes can be defined in a single query to cover different namespaces used in the dataset.
-#' The function 'classEndpoint()' can be used to generate the prefixes for the selected correspondence table.
-#' @param conceptScheme Refers to a unique identifier associated to specific classification table. 
-#' The conceptScheme can be obtained by utilizing the "classEndpoint()" function.
-#' @param correction  The valid values are \code{FALSE} or \code{TRUE}. In both cases the lengths table as an R object.
-#' If the output wants to have a correction for hierarchy levels \code{TRUE}. By default is set to "TRUE". 
-#' @export
-#' @return
-#' \code{lenghtsFile()} returns a table containing the lengths for each hierarchical level of the classification.
-#'    \itemize{
-#'       \item charb: contains the length for each code for each hierarchical level
-#'       \item chare: contains the concatenated length of char b for each code for each hierarchical level
+#' @title Retrieve correspondence table lengths for each hierarchical level
+#' @description
+#' The aim of this function is to provide a table showing the different
+#' levels of hierarchy for a given classification and the character
+#' positions corresponding to each level within the full code.
+#'
+#' @param endpoint SPARQL endpoint. One of \code{"CELLAR"} or \code{"FAO"}.
+#' @param prefix Prefix identifying the classification in the endpoint
+#'   (e.g. \code{"nace2"}, \code{"cn2022"}).
+#' @param conceptScheme Concept scheme identifier used in the SPARQL calls.
+#' @param correction Logical, \code{TRUE} or \code{FALSE}.
+#'   When \code{TRUE} (default), applies classification-specific
+#'   corrections used in production.
+#'
+#' @return A data.frame with two columns:
+#' \itemize{
+#'   \item \code{charb}: starting character position (1-based) of the
+#'         segment corresponding to each hierarchical level (in the
+#'         compact code, without dots/spaces),
+#'   \item \code{chare}: ending character position (1-based) of that
+#'         segment.
 #' }
-#' @examples 
-#' {
-#' endpoint = "CELLAR"
-#' prefix = "nace2"
-#' conceptScheme = "nace2"
-#' 
-#' lengthsTable = lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
-#' 
-#' #View lengthsTable
-#' View(lengthsTable)
-#' 
-#' } 
-
-
-
-lengthsFile = function(endpoint, prefix, conceptScheme, correction = TRUE) {
+#'
+#' @examples
+#' \dontrun{
+#' endpoint <- "CELLAR"
+#' prefix <- "nace2"
+#' conceptScheme <- "nace2"
+#'
+#' lengthsTable <- lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
+#' head(lengthsTable)
+#' }
+lengthsFile <- function(endpoint, prefix, conceptScheme, correction = TRUE) {
+  
+  ## 1. Retrieve level metadata ---------------------------------------------
+  level_dt <- dataStructure(endpoint, prefix, conceptScheme)
+  
+  if (isTRUE(correction)) {
+    # order (for PRODCO)
+    if (prefix %in% c("prodcom2019", "prodcom2021", "prodcom2022")) {
+      level_dt <- level_dt[c(2, 1, 3), , drop = FALSE]
+    }
+    # remove first level (for CN)
+    if (prefix %in% c("cn2017", "cn2018", "cn2019", "cn2020",
+                      "cn2021", "cn2022", "cn2023")) {
+      level_dt <- level_dt[-1, , drop = FALSE]
+    }
+    # order (for CPA)
+    if (prefix %in% c("cpa21")) {
+      level_dt <- level_dt[c(1, 2, 3, 6, 4, 5), , drop = FALSE]
+    }
+  }
+  
+  # Pour toutes les autres classifications, on s'assure que les niveaux
+  # sont dans l'ordre croissant de la colonne 2 (profondeur hiérarchique)
+  special_prefix <- c("prodcom2019", "prodcom2021", "prodcom2022",
+                      "cn2017", "cn2018", "cn2019", "cn2020",
+                      "cn2021", "cn2022", "cn2023",
+                      "cpa21")
+  if (!prefix %in% special_prefix) {
+    # on suppose que level_dt[,2] est numérique ou convertible en numérique
+    ord <- order(suppressWarnings(as.numeric(level_dt[, 2])))
+    level_dt <- level_dt[ord, , drop = FALSE]
+  }
+  
+  nL <- nrow(level_dt)
+  if (nL == 0L) {
+    stop("dataStructure() returned no levels for this classification.")
+  }
+  
+  # On suppose que la deuxième colonne de level_dt contient l'identifiant de niveau
+  level_ids <- level_dt[, 2]
+  
+  # Vecteurs pour stocker les longueurs et positions
+  total_len <- rep(NA_integer_, nL)
+  charb     <- rep(NA_integer_, nL)
+  chare     <- rep(NA_integer_, nL)
+  
+  ## 2. Boucle sur les niveaux ----------------------------------------------
+  for (l in seq_len(nL)) {
     
-    ## Create 'lengths' table - 
-    ## WE NEED TO CLARIFY IF THE LENGTHS FILE IS AUTOMATICALLY OBTAINED OR PROVIDED BY THE USER!
-    level_dt = dataStructure(prefix, conceptScheme, endpoint)
-
+    dt <- retrieveClassificationTable(
+      endpoint      = endpoint,
+      prefix        = prefix,
+      conceptScheme = conceptScheme,
+      level         = level_ids[l]
+    )$ClassificationTable
+    
+    # --- Corrections spécifiques (alignées sur ta version de base) ---------
     if (isTRUE(correction)) {
-        # order (for prodcom) 
-        if (prefix %in% c("prodcom2019", "prodcom2021", "prodcom2022")) {
-            level_dt = level_dt[c(2,1,3),]
+      
+      # ecoicop: remove ".0" for 10, 11, 12 at the first level only
+      if (prefix %in% c("ecoicop") && l == 1L) {
+        idx <- which(dt[, 1] %in% c("10.0", "11.0", "12.0"))
+        if (length(idx) > 0L) {
+          dt[idx, 1] <- c("10", "11", "12")
         }
-        # remove first level (for CN)  
-        if (prefix %in% c("cn2017", "cn2018", "cn2019", "cn2020", "cn2021", "cn2021", "cn2022", "cn2023")) {
-            level_dt = level_dt[-1,]
+      }
+      
+      # prodcom: remove odd codes 00.99.t and 00.99.z at first level
+      if (prefix %in% c("prodcom2019", "prodcom2021", "prodcom2022") && l == 1L) {
+        bad <- which(dt[, 1] %in% c("00.99.t", "00.99.z"))
+        if (length(bad) > 0L) {
+          dt <- dt[-bad, , drop = FALSE]
         }
-        # order (for CPA)
-        if (prefix %in% c("cpa21")) {
-            level_dt = level_dt[c(1,2,3,6,4,5),]
-        }
+      }
+      
+      # NACE / NACE 2.1 / CPA / ISIC:
+      # dans ta version de base, la lettre "A" n'était ajoutée
+      # qu'à partir des niveaux > 1
+      if (prefix %in% c("nace2", "nace21", "cpa21", "ISICrev4") && l > 1L) {
+        dt[, 1] <- paste0("A", dt[, 1])
+      }
+      
+      # ICC_v11: add leading zero at level 2 uniquement
+      if (prefix %in% c("ICC_v11") && l == 2L) {
+        dt[, 1] <- sprintf("%.2f", dt[, 1])
+      }
     }
     
-    #vectors to store info
-    level = length = start_pos = end_pos = numeric(nrow(level_dt))
-    level = level_dt[,2]
+    # 3. Nettoyer les codes : on enlève espaces et points -------------------
+    codes       <- as.character(dt[, 1])
+    codes_clean <- gsub("[ .]", "", codes)
     
-    #level 1 not included (ASK!)
-    dt = retrieveClassificationTable(prefix, endpoint, conceptScheme, level[1])$ClassificationTable
-    if (isTRUE(correction)) {
-        ## remove .0 for 10, 11 and 12 division (ecoicop)
-        if (prefix %in% c("ecoicop")) {
-            dt[,1][which(dt[,1] %in% c("10.0", "11.0", "12.0"))] = c("10", "11", "12") 
-        }
-        ## remove weird code 00.99.t and 00.99.t (for prodcom2019)
-        if (prefix %in% c("prodcom2019", "prodcom2021", "prodcom2022")) {
-            dt = dt[-which(dt[,1] %in% c("00.99.t", "00.99.z")),]
-        }
-    }
+    len_unique <- unique(nchar(codes_clean))
     
-    if (length(unique(nchar(dt[,1]))) > 1) {
-        length[1] = 999
-        start_pos[1] = NA
-        end_pos[1] = NA
+    # Si les longueurs ne sont pas homogènes à ce niveau → impossible de
+    # déterminer un segment propre, on met NA et on avertit.
+    if (length(len_unique) != 1L || is.na(len_unique[1L])) {
+      total_len[l] <- NA_integer_
+      charb[l]     <- NA_integer_
+      chare[l]     <- NA_integer_
+      
+      warning(
+        "Inconsistent code lengths at level ", level_ids[l],
+        " for prefix ", prefix,
+        ". The lengths file may not be reliable for this level."
+      )
+      
     } else {
-        length[1] = unique(nchar(dt[,1]))
-        start_pos[1] = sum(c(unique(sapply(dt[,1], function(x) regexpr("[^ .]", x)))), na.rm = T)
-        if (is.numeric(dt[,1]) == TRUE) {
-            rev_string = sapply(dt[,1], function(x) rev(x))
+      total_len[l] <- len_unique[1L]
+      
+      if (l == 1L) {
+        # Premier niveau : commence au premier caractère
+        charb[l] <- 1L
+        chare[l] <- total_len[l]
+      } else {
+        # Niveaux suivants : segment = différence de longueur totale
+        if (is.na(total_len[l - 1L]) || total_len[l] <= total_len[l - 1L]) {
+          charb[l] <- NA_integer_
+          chare[l] <- NA_integer_
+          
+          warning(
+            "Non-increasing or invalid code length from level ",
+            level_ids[l - 1L], " to level ", level_ids[l],
+            " for prefix ", prefix,
+            ". The lengths file may not be reliable for this level."
+          )
+          
         } else {
-            rev_string = sapply(dt[,1], function(x) intToUtf8(rev(utf8ToInt(x))))
+          seg_len <- total_len[l] - total_len[l - 1L]
+          charb[l] <- chare[l - 1L] + 1L
+          chare[l] <- chare[l - 1L] + seg_len
         }
-        end_pos[1] = sum(c(unique(nchar(dt[,1])), - unique(sapply(rev_string, function(x) regexpr("[^ .]", x))), 1), na.rm = T)
+      }
     }
-    
-    #other levels
-    for (l in 2:nrow(level_dt)) {
-        dt = retrieveClassificationTable(prefix, endpoint, conceptScheme, level[l])$ClassificationTable
-        if (isTRUE(correction)) {
-            ## add letter to code (for NACE, NACE 2.1, CPA and ISIC)
-            if (prefix %in% c("nace2", "nace21", "cpa21", "ISICrev4")) {
-                dt[,1] = paste0("A", dt[,1])
-            }
-            ## add leading zero for ICC_v11
-            if (prefix %in% c("ICC_v11")) {
-                if (l == 2){  dt[,1] = sprintf("%.2f", dt[,1])    }
-            }
-        }
-        
-        if (length(unique(nchar(dt[,1]))) > 1) {
-            length[l] = 999
-            start_pos[l] = NA
-            end_pos[l] = NA
-        } else {
-            length[l] = unique(nchar(dt[,1])) 
-            code = sapply(dt[,1], function(x) substring(x, first = end_pos[l-1] + 1, last = length[l]))
-            start_pos[l] = sum(c(unique(sapply(code, function(x) regexpr("[^ .]", x))), end_pos[l-1]), na.rm = T)
-            rev_string = sapply(code, function(x) intToUtf8(rev(utf8ToInt(x))))
-            end_pos[l] = sum(c(unique(nchar(code)), - unique(sapply(rev_string, function(x) regexpr("[^ .]", x))), 1, end_pos[l-1]), na.rm = T)
-        } 
-    }
-
-    #create length table 
-    level_table = data.frame(level, length, start_pos, end_pos)
-    
-    charb = start_pos
-    chare = end_pos
-    lengths = data.frame(cbind(charb, chare))
-
-    if (TRUE %in% is.na(lengths[,1]) | TRUE %in% is.na(lengths[,2])){
-        warning("There is a problem with the given classification and the lenghts file produced should not be trusted. Please check the classification and correct any issue.")
-    }
-    
-    if (isFALSE(correction)){
-        warning("The lenghts file produced could be wrong. Please make sure the classification is correct.")
-    }       
-        
-    return(lengths)
+  }
+  
+  ## 3. Table finale --------------------------------------------------------
+  lengths <- data.frame(
+    charb = charb,
+    chare = chare,
+    stringsAsFactors = FALSE
+  )
+  
+  if (any(is.na(lengths$charb) | is.na(lengths$chare))) {
+    warning(
+      "There is a problem with the given classification; ",
+      "the lengths file produced should not be fully trusted. ",
+      "Please check the classification and correct any issue."
+    )
+  }
+  
+  if (isFALSE(correction)) {
+    warning(
+      "The lengths file produced could be wrong. ",
+      "Please make sure the classification is correct."
+    )
+  }
+  
+  return(lengths)
 }
-
-
-
-## Retrieve Classification 
-#prefix = "nace2" 
-#conceptScheme = "nace2"
-#endpoint = "CELLAR"
-
-#lengthsTable = lengthsFile(endpoint, prefix, conceptScheme, correction = TRUE)
-#lengthsTable
-
-#lengthsTable = lengthsFile(endpoint, prefix, conceptScheme, correction = FALSE)
-#lengthsTable

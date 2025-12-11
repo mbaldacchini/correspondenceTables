@@ -4,11 +4,15 @@
 \alias{correspondenceTableList}
 \title{Retrieve a list of all correspondence tables in the CELLAR and FAO repositories}
 \usage{
-correspondenceTableList(endpoint)
+correspondenceTableList(endpoint, showQuery = FALSE)
 }
 \arguments{
 \item{endpoint}{Character. SPARQL endpoint(s) to query. Valid values are:
 \code{"CELLAR"}, \code{"FAO"}, or \code{"ALL"} (default).}
+
+\item{showQuery}{Logical; if \code{TRUE}, the SPARQL query used for each
+prefix is printed (and can be inspected by the user). This is mainly
+intended for debugging or reproducibility. Default is \code{FALSE}.}
 }
 \value{
 If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
@@ -20,21 +24,26 @@ If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
   \item Table Name
   \item URI
 }
-If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s: one for each endpoint.
+If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s:
+one for each endpoint.
 }
 \description{
-List all correspondence tables in the CELLAR of FAO repositories
+List all correspondence tables in the CELLAR or FAO repositories.
 }
 \details{
-The behaviour of this function is contingent on the global option \code{useLocalDataForVignettes}:
-The default behaviour (when the option is not set, or set to something else than \code{TRUE}), is that is queries live SPARQL endpoints online.
-When the option is set to \code{TRUE} via \code{options(useLocalDataForVignettes = TRUE)}, the function returns local (embedded) data instead of querying live SPARQL endpoints.
+The behaviour of this function is contingent on the global option
+\code{useLocalDataForVignettes}:
+the default behaviour (when the option is not set, or set to something else
+than \code{TRUE}), is that it queries live SPARQL endpoints online.
+When the option is set to \code{TRUE} via
+\code{options(useLocalDataForVignettes = TRUE)}, it may return local
+(embedded) data instead of querying live SPARQL endpoints.
 This is useful for building vignettes or offline testing.
 }
 \examples{
 if (interactive()) {
   # Retrieve list of all available correspondence tables
   corr_list <- correspondenceTableList("ALL")
-  View(corr_list)
+  print(corr_list)
 }
 }

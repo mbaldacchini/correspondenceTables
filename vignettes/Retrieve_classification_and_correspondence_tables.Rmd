@@ -44,7 +44,7 @@ The following code is used to retrieve the NACE2 classification from CELLAR:
 ```{r, results = "hide"}
 endpoint = "CELLAR"
 # obtain prefix and conceptscheme using classificationEndpoint()
-classificationEndpoint(endpoint)[[1]][,1:4]
+classificationEndpoint(endpoint)
 prefix = "nace21"
 conceptScheme = "nace2.1"
 ## You can modify the language by example "en" "bg"
@@ -53,11 +53,10 @@ CSVout = F
 showQuery = TRUE
 level = "ALL"
 # identify lower level using dataStructure()
-# level_dt = dataStructure(prefix, conceptScheme, endpoint, language)
-# level = level_dt[nrow(level_dt),2]
-# level_dt; level
+ level_dt = dataStructure(endpoint,prefix, conceptScheme,language)
+ # level = as.integer(level_dt[nrow(level_dt),2])
 
-result_ls = retrieveClassificationTable(prefix, endpoint, conceptScheme, level , language, CSVout, showQuery)
+#result_ls = retrieveClassificationTable(endpoint,prefix,conceptScheme, level , language, CSVout, showQuery)
 
 # identify the SPARQL query used
 SPARQLquery = result_ls[[1]]
@@ -113,31 +112,30 @@ The function returns a table with the following columns:
 
 The following code produce a list including the structure of each classification available in CELLAR and FAO. 
 ```{r,results = "hide"}
-## Obtain the structure of all classifications 
+## Obtain the structure of all classifications
 ## CELLAR
-# data_CELLAR = list()
-# endpoint = "CELLAR"
-# #Get info to retrieve structure using classificationEndpoint()
-# list_data = classificationEndpoint("ALL")
+data_CELLAR = list()
+ endpoint = "CELLAR"
+ ##Get info to retrieve structure using classificationEndpoint()
+ list_data = classificationEndpoint("ALL")
 
-# #loop over all classification in CELLAR
-# for (i in 1:nrow(list_data$CELLAR)){
-#   prefix = list_data$CELLAR[i,1] 
-#   conceptScheme = list_data$CELLAR[i,2] 
-#   #language by default is English
-#   data_CELLAR[[i]] = dataStructure(prefix, conceptScheme, endpoint)
-# }
-# names(data_CELLAR) = list_data$CELLAR[,1] 
+# # #loop over all classification in CELLAR
+#  for (i in 1:nrow(list_data$CELLAR)){
+#    prefix = list_data$CELLAR[i,1]
+#    conceptScheme = list_data$CELLAR[i,2]
+#    #language by default is English
+#    data_CELLAR[[i]] = dataStructure(endpoint,prefix, conceptScheme) }
+# # names(data_CELLAR) = list_data$CELLAR[,1]
 
-## FAO 
-# data_FAO = list()
-# endpoint = "FAO"
-# for (i in 1:nrow(list_data$FAO)){
-#   prefix = list_data$FAO[i,1]
-#   conceptScheme = list_data$FAO[i,2] 
-#   data_FAO[[i]] = dataStructure(prefix, conceptScheme, endpoint)
-# }
-# names(data_FAO) =  list_data$FAO[,1]
+# ## FAO
+#  data_FAO = list()
+#  endpoint = "FAO"
+#  for (i in 1:nrow(list_data$FAO)){
+#    prefix = list_data$FAO[i,1]
+#    conceptScheme = list_data$FAO[i,2]
+#    data_FAO[[i]] = dataStructure(endpoint,prefix, conceptScheme)
+#  }
+#  names(data_FAO) =  list_data$FAO[,1]
 ```
 
 ## Extract Correspondence Tables

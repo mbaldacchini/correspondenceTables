@@ -41,6 +41,14 @@
 #' pre-computed CSV data for the requested endpoint(s). This allows vignettes
 #' to be built reproducibly and without network access.
 #'
+#' @param endpoint Character string indicating which repository to query.
+#'   Must be one of \code{"CELLAR"}, \code{"FAO"} or \code{"ALL"} (the latter
+#'   queries both repositories and returns a named list).
+#'
+#' @param showQuery Logical; if \code{TRUE}, the function returns, in addition
+#'   to the classification list, the SPARQL query (or queries) used to produce
+#'   the result. Defaults to \code{FALSE}.
+#'
 #' @return
 #' If \code{endpoint} is \code{"CELLAR"} or \code{"FAO"} and
 #' \code{showQuery = FALSE}, the function returns a data frame with the
@@ -75,22 +83,35 @@
 #' \code{"SPARQL.query"} (the query used to obtain it).
 #'
 #' @examples
-#' \donttest{
-#' # Example 1: default behaviour (live query — requires internet)
-#' # head(classificationList("CELLAR"))
-#'
-#' # Example 2: offline mode using embedded CSVs
+#' # --- Offline mode (uses embedded CSVs, no internet required) ---
+#' old_opt <- getOption("useLocalDataForVignettes")
 #' options(useLocalDataForVignettes = TRUE)
+#'
+#' # List of available classification schemes in CELLAR (offline)
+#' head(classificationList("CELLAR"))
+#'
+#' # List of available classification schemes in FAO (offline)
 #' head(classificationList("FAO"))
 #'
-#' # Example 3: retrieve SPARQL query for debugging
+#' # Restore previous option
+#' options(useLocalDataForVignettes = old_opt)
+#'
+#' \dontrun{
+#' # --- Online examples (live SPARQL, requires internet connection) ---
+#'
+#' # Direct query on CELLAR
+#' head(classificationList("CELLAR"))
+#'
+#' # Retrieve SPARQL query for debugging
 #' res <- classificationList("CELLAR", showQuery = TRUE)
 #' names(res)
 #' }
 #'
 #' @import httr
 #' @import jsonlite
+#' @importFrom utils capture.output str
 #' @export
+
 
 classificationList <- function(endpoint = "ALL", showQuery = FALSE) {
   endpoint <- toupper(endpoint)
@@ -158,18 +179,16 @@ WHERE {
           skos:prefLabel ?title_en .
   FILTER (LANG(?title_en) = 'en')
 
-  # Garder seulement data.europa.eu (http ou https) sans REGEX
   FILTER (
     STRSTARTS(STR(?scheme), 'http://data.europa.eu/') ||
     STRSTARTS(STR(?scheme), 'https://data.europa.eu/')
   )
 
-  # (Inutile d’exclure EuroVoc si on restreint à data.europa.eu)
+
   ?scheme ?p <http://publications.europa.eu/resource/authority/corporate-body/ESTAT> .
 
   OPTIONAL { ?scheme skos:notation ?notation }
 
-  # Langues observées au niveau des concepts
   ?concept a skos:Concept ;
            skos:inScheme ?scheme ;
            skos:prefLabel ?clab .

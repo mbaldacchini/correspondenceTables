@@ -1,58 +1,105 @@
-#' @title Retrieve information about the structure of each classification table from the CELLAR and FAO repositories
-#' @description Retrieve information about the structure of a classification table (from either CELLAR and FAO repositories)
-#' @param endpoint SPARQL endpoints provide a standardized way to access data sets, 
-#' making it easier to retrieve specific information or perform complex queries on linked data.
-#' The valid values are \code{"CELLAR"} or \code{"FAO"}.
-#' @param prefix Prefixes are typically defined at the beginning of a SPARQL query 
-#' and are used throughout the query to make it more concise and easier to read. 
-#' Multiple prefixes can be defined in a single query to cover different namespaces used in the data set.
-#' The function 'classificationList()' can be used to generate the prefixes for the selected classification table. 
-#' @param conceptScheme Refers to a unique identifier associated to specific classification table. 
-#' The conceptScheme can be obtained by utilizing the "classificationList()" function.
-#' @param language The language for which the labels (level names) are to be provided. This is an optional argument which defaults to "en".
-#' @param showQuery The valid values are \code{FALSE} or \code{TRUE}. In both cases the correspondence table as an R object. 
-#' If needed to view the SPARQL query used, the argument should be set as \code{TRUE}. By default, NO SPARQL query is produced.
+#' @title Retrieve the hierarchical structure of a classification scheme
+#'
+#' @description
+#' This function retrieves structural information about a classification scheme
+#' hosted in the CELLAR or FAO SPARQL repositories.  
+#' It returns one row per hierarchical level and includes metadata such as:
+#' \itemize{
+#'   \item the name of the classification scheme,
+#'   \item the depth of each level,
+#'   \item the label of the level (in a selected language),
+#'   \item the number of categories present at that level.
+#' }
+#'
+#' @param endpoint Character string specifying which SPARQL endpoint to query.
+#' Must be one of:
+#' \itemize{
+#'   \item \code{"CELLAR"},
+#'   \item \code{"FAO"}.
+#' }
+#'
+#' @param prefix Character string giving the namespace prefix used for the
+#'   selected classification scheme in SPARQL.  
+#'   This value must correspond to the \code{Prefix} column returned by
+#'   \code{\link{classificationEndpoint}} for the chosen scheme, and it is
+#'   used in the query to:
+#'   \itemize{
+#'     \item build the \code{PREFIX} declaration (\code{prefixList}),
+#'     \item qualify the scheme and its members
+#'           (e.g. \code{prefix:conceptScheme}, \code{prefix:SomeMember}).
+#'   }
+#'
+#' @param conceptScheme The internal identifier of the classification scheme
+#'   (also returned by \code{\link{classificationEndpoint}}). It is used in
+#'   the SPARQL query together with \code{prefix} to select the target scheme.
+#'
+#' @param language Character string giving the language code for level labels.
+#'   Defaults to \code{"en"}.
+#'
+#' @param showQuery Logical.  
+#'   If \code{FALSE} (default), only the resulting data frame is returned.  
+#'   If \code{TRUE}, the function returns a list containing:
+#'   \itemize{
+#'     \item \code{SPARQL.query}: the full query text,
+#'     \item \code{dataStructure}: the resulting table.
+#'   }
+#'
+#' @details
+#' Before executing any SPARQL query, the function performs a pre-check using
+#' \code{\link{classificationEndpoint}} to ensure that the combination
+#' (\code{prefix}, \code{conceptScheme}) exists for the selected endpoint.
+#'
+#' If the combination does not exist, or if the endpoint is unavailable,
+#' the function stops with a clear error message *before* issuing any SPARQL request.
+#'
+#' The behaviour of this function is also affected by the global option
+#' \code{useLocalDataForVignettes}.  
+#' If set to \code{TRUE}, a local CSV file is returned instead of querying
+#' live endpoints. This is useful for offline use or vignette building.
+#'
+#' @return
+#' A data frame containing one row per level of the classification, with
+#' the following columns:
+#' \itemize{
+#'   \item \code{Concept_Scheme} – name of the classification scheme,
+#'   \item \code{Depth} – hierarchical depth of the level,
+#'   \item \code{Level} – label of the level (in the selected language),
+#'   \item \code{Count} – number of categories at this level.
+#' }
+#'
+#' If \code{showQuery = TRUE}, a list is returned instead (see details).
+#'
+#' @examples
+#' \dontrun{
+#' # Minimal example (CELLAR)
+#' dataStructure("CELLAR", prefix = "nace2", conceptScheme = "nace2")
+#'
+#' # Loop over all CELLAR schemes
+#' list_data <- classificationEndpoint("CELLAR")
+#' res <- list()
+#' for (i in seq_len(nrow(list_data))) {
+#'   p  <- list_data$Prefix[i]
+#'   cs <- list_data$ConceptScheme[i]
+#'   res[[p]] <- dataStructure("CELLAR", prefix = p, conceptScheme = cs)
+#' }
+#' }
+#'
+#' @seealso
+#' \code{\link{classificationEndpoint}},
+#' \code{\link{retrieveClassificationTable}}.
+#'
 #' @import httr
 #' @import jsonlite
 #' @export
-#' @return
-#' \code{dataStructure()} returns a table with one line per hierarchical level and the following columns:        
-#'  \itemize{
-#'     \item Concept_Scheme: the classification for which the data structure is listed
-#'     \item Depth: the hierarchical position of each level
-#'     \item Level: the label (for the given language) assigned to each level
-#'     \item Count: the number of categories at each level
-#' }
-#' @details
-#' The behaviour of this function is contingent on the global option \code{useLocalDataForVignettes}:
-#' The default behaviour (when the option is not set, or set to something else than \code{TRUE}), it queries live SPARQL endpoints online.
-#' When the option is set to \code{TRUE} via \code{options(useLocalDataForVignettes = TRUE)}, the function returns local (embedded) data instead of querying live SPARQL endpoints.
-#' This is useful for building vignettes or offline testing.
-#' @examples
-#' # Minimal example using CELLAR endpoint
-#' endpoint <- "CELLAR"
-#' prefix <- "nace2"
-#' conceptScheme <- "nace2"
-#' dataStructure(endpoint, prefix, conceptScheme)
-#' \dontrun{
-#' # Full example: get data for all CELLAR codes
-#' list_data <- classificationList("ALL")
-#' data_CELLAR <- list()
-#' for (i in 1:nrow(list_data$CELLAR)) {
-#'   prefix <- list_data$CELLAR[i, 1]
-#'   conceptScheme <- list_data$CELLAR[i, 2]
-#'   data_CELLAR[[i]] <- dataStructure("CELLAR", prefix, conceptScheme)
-#' }
-#' names(data_CELLAR) <- list_data$CELLAR[, 1]
-#' }
+
 
   
 
 dataStructure = function(endpoint, prefix, conceptScheme, language = "en", showQuery = FALSE) {
   #Check correctness of endpoint argument
   endpoint <- toupper(endpoint)
-  if (!(endpoint %in% c("ALL", "FAO", "CELLAR"))) {
-    stop(simpleError(paste("The endpoint value:", endpoint, "is not accepted")))
+  if (!endpoint %in% c("CELLAR", "FAO")) {
+    stop("`endpoint` must be either 'CELLAR' or 'FAO'.")
   }
   # Check the useLocalDataForVignettes option
   if (getOption("useLocalDataForVignettes", FALSE)) {
@@ -69,18 +116,75 @@ dataStructure = function(endpoint, prefix, conceptScheme, language = "en", showQ
     }
   } else {
   
-  ### Load the configuration file from GitHub
-  config <- fromJSON("https://raw.githubusercontent.com/eurostat/correspondenceTables/refs/heads/main/inst/extdata/endpoint_source_config.json")    
-  ### Define endpoint
-  if (endpoint == "CELLAR") {
-    source = config$CELLAR
-    url = "data.europa.eu/"
-  }
-  if (endpoint == "FAO") {
-    source = config$FAO
-    url = "unstats.un.org/"
-  }
-  
+    ### Try to load endpoint configuration from GitHub
+    config <- tryCatch(
+      jsonlite::fromJSON(
+        "https://raw.githubusercontent.com/eurostat/correspondenceTables/main/inst/extdata/endpoint_source_config.json"
+      ),
+      error = function(e) NULL
+    )
+    
+    ### Default hardcoded endpoints
+    default_endpoints <- list(
+      CELLAR = "http://publications.europa.eu/webapi/rdf/sparql",
+      FAO    = "https://stats.fao.org/caliper/sparql/AllVocs"
+    )
+    
+    ### Select source endpoint
+    if (!is.null(config)) {
+      source <- config[[endpoint]]
+    } else {
+      source <- default_endpoints[[endpoint]]
+    }
+    
+    ### URL base (unchanged)
+    if (endpoint == "CELLAR") url <- "data.europa.eu/"
+    if (endpoint == "FAO")    url <- "unstats.un.org/"
+    
+    # --- Pre-check with classificationEndpoint() before running SPARQL ----
+    # (1) Try to list available schemes for this endpoint
+    ce_res <- tryCatch(
+      classificationEndpoint(endpoint),
+      error = function(e) {
+        stop(simpleError(
+          paste0(
+            "classificationEndpoint() failed when called from dataStructure(",
+            "endpoint = '", endpoint, "', ",
+            "prefix = '", prefix, "', ",
+            "conceptScheme = '", conceptScheme, "'): ",
+            conditionMessage(e)
+          )
+        ))
+      }
+    )
+    
+    # For a single endpoint, classificationEndpoint() should return a data.frame
+    if (!is.data.frame(ce_res)) {
+      stop(simpleError(
+        paste0(
+          "Unexpected object returned by classificationEndpoint('", endpoint,
+          "') when called from dataStructure()."
+        )
+      ))
+    }
+    
+    # (2b) Check that (prefix, conceptScheme) exists in classificationEndpoint()
+    match_row <- ce_res$Prefix == prefix & ce_res$ConceptScheme == conceptScheme
+    
+    if (!any(match_row)) {
+      # (3b) -> Do NOT run SPARQL, issue informative error
+      stop(simpleError(
+        paste0(
+          "The combination (prefix = '", prefix, "', conceptScheme = '", conceptScheme,
+          "', language = '", language, "') is not available for endpoint '", endpoint,
+          "' according to classificationEndpoint(). No SPARQL call was made."
+        )
+      ))
+    }
+    
+    # (3a) If we arrive here, the combination exists -> proceed with SPARQL
+    
+    
   ## Create Prefixes list 
   prefix_ls = prefixList(endpoint, prefix = prefix)
   prefix_ls = as.character(paste(prefix_ls, collapse = "\n"))
@@ -147,7 +251,7 @@ dataStructure = function(endpoint, prefix, conceptScheme, language = "en", showQ
     result[[1]]= SPARQL.query
     result[[2]]= table
     names(result)=c("SPARQL.query", "dataStructure")
-    cat(result$SPARQL.query, sep ="/n")
+    cat(result$SPARQL.query, sep = "\n")
     return(result)
   } else {
     return(table)
