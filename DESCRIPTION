@@ -26,7 +26,7 @@ NeedsCompilation: no
 URL: https://github.com/eurostat/correspondenceTables
 BugReports: https://github.com/eurostat/correspondenceTables/issues
 Maintainer: Mátyás Mészáros <matyas.meszaros@ec.europa.eu>
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Config/testthat/edition: 3
 Packaged: 2025-09-14 21:32:35 UTC; thoma
 Author: Vasilis Chasiotis [aut] (Department of Statistics, Athens University of
