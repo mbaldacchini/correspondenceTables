@@ -7,12 +7,11 @@
 correspondenceTableList(endpoint = "ALL", showQuery = FALSE)
 }
 \arguments{
-\item{endpoint}{Character. SPARQL endpoint(s) to query. Valid values are:
+\item{endpoint}{Character. SPARQL endpoint(s) to query. One of:
 \code{"CELLAR"}, \code{"FAO"}, or \code{"ALL"} (default).}
 
-\item{showQuery}{Logical; if \code{TRUE}, the SPARQL query used for each
-prefix is printed (and can be inspected by the user). This is mainly
-intended for debugging or reproducibility. Default is \code{FALSE}.}
+\item{showQuery}{Logical; if \code{TRUE}, prints the SPARQL query used.
+Default is \code{FALSE}.}
 }
 \value{
 If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
@@ -24,26 +23,25 @@ If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
   \item Table.Name
   \item URI
 }
-If \code{endpoint = "ALL"}, returns a named list of two \code{data.frame}s:
-one for each endpoint.
+If \code{endpoint = "ALL"}, returns a named list with elements \code{$CELLAR}
+and \code{$FAO}, each a \code{data.frame} as above.
 }
 \description{
-List all correspondence tables in the CELLAR or FAO repositories.
+Lists all correspondence tables (XKOS correspondences) in the selected endpoint(s).
+The function relies on \code{classificationList()} to obtain the set of known
+classification schemes, then retrieves correspondences that reference those schemes.
 }
 \details{
-The behaviour of this function is contingent on the global option
-\code{useLocalDataForVignettes}:
-the default behaviour (when the option is not set, or set to something else
-than \code{TRUE}), is that it queries live SPARQL endpoints online.
-When the option is set to \code{TRUE} via
-\code{options(useLocalDataForVignettes = TRUE)}, it may return local
-(embedded) data instead of querying live SPARQL endpoints.
-This is useful for building vignettes or offline testing.
+Behaviour depends on the global option \code{useLocalDataForVignettes}:
+\itemize{
+  \item If \code{TRUE}: reads pre-embedded CSVs in \code{inst/extdata}.
+  \item If \code{FALSE}: runs live SPARQL queries.
+}
 }
 \examples{
 if (interactive()) {
-  # Retrieve list of all available correspondence tables
-  corr_list <- correspondenceTableList("ALL")
-  print(corr_list)
+  out <- correspondenceTableList("ALL")
+  head(out$CELLAR)
+  head(out$FAO)
 }
 }

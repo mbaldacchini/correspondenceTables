@@ -10,73 +10,77 @@ retrieveCorrespondenceTable(
   ID_table,
   language = "en",
   CSVout = FALSE,
-  showQuery = TRUE
+  showQuery = FALSE
 )
 }
 \arguments{
-\item{endpoint}{Character string indicating which SPARQL endpoint to
-query. Must be one of:
-\itemize{
-  \item \code{"CELLAR"}
-  \item \code{"FAO"}
-}}
+\item{endpoint}{Character: "CELLAR" or "FAO".}
 
-\item{prefix}{Character string giving the namespace prefix of the
-correspondence table itself.
-This prefix must match the prefix used to identify the correspondence
-scheme in the CELLAR or FAO repository (e.g. \code{"cn2022"},
-\code{"cpa2015"}, etc.).}
+\item{prefix}{Character: namespace prefix of the correspondence table (e.g., "cn2022").}
 
-\item{ID_table}{Character string giving the identifier of the
-correspondence table to retrieve (e.g. \code{"CN2022_NST2007"}).}
+\item{ID_table}{Character: identifier of the correspondence (e.g., "CN2022_NACE2").}
 
-\item{language}{Character string indicating the language used for labels
-and notes. Defaults to \code{"en"}.}
+\item{language}{Character: label language (default "en").}
 
-\item{CSVout}{Logical or character. Controls CSV export:
-\itemize{
-  \item \code{FALSE} (default): no file is written,
-  \item \code{TRUE}: the table is written to \code{<ID_table>_table.csv},
-  \item character: explicit filepath where the table is saved.
-}}
+\item{CSVout}{Logical or character: FALSE (default), TRUE (auto filename), or explicit path.}
 
-\item{showQuery}{Logical. If \code{TRUE} (default), the function returns
-a list containing both the SPARQL query and the resulting correspondence
-table. If \code{FALSE}, only the table (data frame) is returned.}
+\item{showQuery}{Logical: TRUE returns list(query, table); FALSE returns data.frame only.}
 }
 \value{
-If \code{showQuery = TRUE}, a list with:
+If \code{showQuery = FALSE}, returns a \code{data.frame} where each row
+represents one mapping between a source concept and a target concept.
+
+The columns returned are:
+
 \itemize{
-  \item \code{SPARQL.query}: the full SPARQL query,
-  \item \code{CorrespondenceTable}: a data frame with one row per mapping.
+
+  \item \code{<A>}  
+        The notation/code of the source concept (e.g. "CN2022" code).
+
+  \item \code{<B>}  
+        The notation/code of the target concept (e.g. "NACE2" code).  
+
+  \item \code{Label_<A>}  
+        Human‑readable label of the source concept in the selected language
+        (prefLabel or altLabel via COALESCE).
+
+  \item \code{Label_<B>}  
+        Human‑readable label of the target concept in the selected language
+        (prefLabel or altLabel).  
+
+  \item \code{Include_<A>}  
+        SKOS \code{scopeNote} attached to the source concept.  
+        Represents textual information describing what is *included* in the definition
+        of the source concept.  
+        Often empty; presence depends on the classification metadata.
+
+  \item \code{Exclude_<A>}  
+        XKOS \code{exclusionNote} on the source concept.  
+        Describes what is *explicitly excluded* from the meaning of the concept.
+
+  \item \code{Include_<B>}  
+        SKOS \code{scopeNote} for the target concept.  
+        Same meaning as \code{Include_<A>} but on the target side.
+
+  \item \code{Exclude_<B>}  
+        XKOS \code{exclusionNote} for the target concept.  
+        Same semantics as \code{Exclude_<A>}, but for the target.
+
+  \item \code{Comment}  
+        Free‑text comment attached to the correspondence association
+        (from \code{rdfs:comment}).  
+
+  \item \code{URL}  
+        String representation of the association (the internal URI of the mapping link).
 }
 
-If \code{showQuery = FALSE}, only the correspondence table (data frame)
-is returned.
+If \code{showQuery = TRUE}, returns a list with two elements:
+\itemize{
+  \item \code{SPARQL.query}: the full query issued to the endpoint;
+  \item \code{CorrespondenceTable}: the data.frame described above.
+}
 }
 \description{
-This function retrieves a correspondence (mapping) table between two
-statistical classifications stored as Linked Open Data in the CELLAR or
-FAO repositories.
-}
-\examples{
-\dontrun{
-  endpoint <- "CELLAR"
-  prefix   <- "cn2022"
-  ID_table <- "CN2022_NACE2"
-
-  res <- retrieveCorrespondenceTable(
-    endpoint = endpoint,
-    prefix   = prefix,
-    ID_table = ID_table
-  )
-
-  cat(res$SPARQL.query)
-  head(res$CorrespondenceTable)
-}
-
-}
-\seealso{
-\code{\link{classificationEndpoint}},
-\code{\link{retrieveClassificationTable}}
+Retrieves a correspondence (mapping) table between two statistical classifications (SKOS/XKOS)
+stored as Linked Open Data in the CELLAR or FAO repositories.
 }
