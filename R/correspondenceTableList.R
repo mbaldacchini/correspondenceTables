@@ -1,317 +1,384 @@
-#' @title Retrieve correspondence tables between statistical classifications from CELLAR and FAO repositories.
-#' 
+#' @title Retrieve a list of all correspondence tables in the CELLAR and FAO repositories
+#'
 #' @description
-#' Retrieves a correspondence (mapping) table between two statistical classifications (SKOS/XKOS)
-#' stored as Linked Open Data in the CELLAR or FAO repositories.
-#' 
-#' @param endpoint Character: "CELLAR" or "FAO".
-#' @param prefix Character: namespace prefix of the correspondence table (e.g., "cn2022").
-#' @param ID_table Character: identifier of the correspondence (e.g., "CN2022_NACE2").
-#' @param language Character: label language (default "en").
-#' @param CSVout Logical or character: FALSE (default), TRUE (auto filename), or explicit path.
-#' @param showQuery Logical: TRUE returns list(query, table); FALSE returns data.frame only.
-#' 
-
+#' Lists all correspondence tables (XKOS correspondences) in the selected endpoint(s).
+#' The function relies on \code{classificationList()} to obtain the set of known
+#' classification schemes, then retrieves correspondences that reference those schemes.
+#'
+#' @param endpoint Character. SPARQL endpoint(s) to query. One of:
+#'   \code{"CELLAR"}, \code{"FAO"}, or \code{"ALL"} (default).
+#' @param showQuery Logical; if \code{TRUE}, prints the SPARQL query used.
+#'   Default is \code{FALSE}.
+#'
 #' @return
-#' If \code{showQuery = FALSE}, returns a \code{data.frame} where each row
-#' represents one mapping between a source concept and a target concept.
-#'
-#' The columns returned are:
-#'
+#' If \code{endpoint = "CELLAR"} or \code{"FAO"}, returns a \code{data.frame} with:
 #' \itemize{
+#'   \item Prefix
+#'   \item ID
+#'   \item Source.Classification
+#'   \item Target.Classification
+#'   \item Table.Name
+#'   \item URI
+#' }
+#' If \code{endpoint = "ALL"}, returns a named list with elements \code{$CELLAR}
+#' and \code{$FAO}, each a \code{data.frame} as above.
 #'
-#'   \item \code{<A>}  
-#'         The notation/code of the source concept (e.g. "CN2022" code).
-#'
-#'   \item \code{<B>}  
-#'         The notation/code of the target concept (e.g. "NACE2" code).  
-#'
-#'   \item \code{Label_<A>}  
-#'         Human‑readable label of the source concept in the selected language
-#'         (prefLabel or altLabel via COALESCE).
-#'
-#'   \item \code{Label_<B>}  
-#'         Human‑readable label of the target concept in the selected language
-#'         (prefLabel or altLabel).  
-#'
-#'   \item \code{Include_<A>}  
-#'         SKOS \code{scopeNote} attached to the source concept.  
-#'         Represents textual information describing what is *included* in the definition
-#'         of the source concept.  
-#'         Often empty; presence depends on the classification metadata.
-#'
-#'   \item \code{Exclude_<A>}  
-#'         XKOS \code{exclusionNote} on the source concept.  
-#'         Describes what is *explicitly excluded* from the meaning of the concept.
-#'
-#'   \item \code{Include_<B>}  
-#'         SKOS \code{scopeNote} for the target concept.  
-#'         Same meaning as \code{Include_<A>} but on the target side.
-#'
-#'   \item \code{Exclude_<B>}  
-#'         XKOS \code{exclusionNote} for the target concept.  
-#'         Same semantics as \code{Exclude_<A>}, but for the target.
-#'
-#'   \item \code{Comment}  
-#'         Free‑text comment attached to the correspondence association
-#'         (from \code{rdfs:comment}).  
-#'
-#'   \item \code{URL}  
-#'         String representation of the association (the internal URI of the mapping link).
+#' @details
+#' Behaviour depends on the global option \code{useLocalDataForVignettes}:
+#' \itemize{
+#'   \item If \code{TRUE}: reads pre-embedded CSVs in \code{inst/extdata}.
+#'   \item If \code{FALSE}: runs live SPARQL queries.
 #' }
 #'
-#' If \code{showQuery = TRUE}, returns a list with two elements:
-#' \itemize{
-#'   \item \code{SPARQL.query}: the full query issued to the endpoint;
-#'   \item \code{CorrespondenceTable}: the data.frame described above.
-#' }
-#' 
 #' @import httr
-#' 
+#' @import jsonlite
 #' @export
+#'
+#' @examples
+#' if (interactive()) {
+#'   out <- correspondenceTableList("ALL")
+#'   head(out$CELLAR)
+#'   head(out$FAO)
+#' }
 
-retrieveCorrespondenceTable <- function(endpoint,
-                                        prefix,
-                                        ID_table,
-                                        language = "en",
-                                        CSVout   = FALSE,
-                                        showQuery = FALSE) {
-  #-------------------------------
-  # 0) Normalize / validate endpoint
-  #-------------------------------
-  endpoint <- toupper(trimws(endpoint))
-  if (!endpoint %in% c("CELLAR", "FAO")) {
-    stop(simpleError(
-      paste("The endpoint value:", endpoint, "is not accepted. Use 'CELLAR' or 'FAO'.")
-    ))
+
+correspondenceTableList <- function(endpoint = "ALL", showQuery = FALSE) {
+  endpoint <- toupper(endpoint)
+  if (!(endpoint %in% c("ALL", "FAO", "CELLAR"))) {
+    stop(simpleError(paste("The endpoint value:", endpoint, "is not accepted")))
   }
   
-  #-------------------------------
-  # 1) SPARQL endpoint URL
-  #-------------------------------
-  endpoint_url <- if (endpoint == "CELLAR") {
-    "http://publications.europa.eu/webapi/rdf/sparql"
-  } else {
-    # "https://stats.fao.org/caliper/sparql/AllVocs"
-    "https://caliper.integratedmodelling.org/caliper/sparql"  
-  }
-  
-  #---------------------------------------------------------
-  # 2) Pre-check via correspondenceTableList()
-  #---------------------------------------------------------
-  ct_list <- tryCatch(
-    correspondenceTableList(endpoint),
-    error = function(e) {
-      stop(simpleError(
-        paste0(
-          "correspondenceTableList() failed when called from retrieveCorrespondenceTable(",
-          "endpoint = '", endpoint, "', prefix = '", prefix,
-          "', ID_table = '", ID_table, "', language = '", language, "').\n",
-          "Original error: ", conditionMessage(e),
-          "\nNo SPARQL request was executed."
-        )
+  # ---------- Offline / vignette mode ----------
+  if (getOption("useLocalDataForVignettes", FALSE)) {
+    if (endpoint == "ALL") {
+      return(list(
+        CELLAR = correspondenceTableList("CELLAR", showQuery = showQuery),
+        FAO    = correspondenceTableList("FAO",    showQuery = showQuery)
       ))
     }
-  )
-  
-  # Normalize ct_list -> ct_df (supports data.frame, list<df>, or matrix)
-  if (is.data.frame(ct_list)) {
-    ct_df <- ct_list
-    
-  } else if (is.list(ct_list) && length(ct_list) > 0L &&
-             all(vapply(ct_list, is.data.frame, logical(1)))) {
-    ct_df <- do.call(rbind, ct_list)
-    rownames(ct_df) <- NULL
-    
-  } else if (is.matrix(ct_list)) {
-    # Matrix with rownames as field names and columns as entries (observed for CELLAR)
-    m  <- ct_list
-    df <- as.data.frame(t(m), stringsAsFactors = FALSE)
-    colnames(df) <- rownames(m)
-    rownames(df) <- NULL
-    ct_df <- df
-    
-  } else {
-    stop(simpleError(
-      paste0(
-        "Unexpected object returned by correspondenceTableList('", endpoint,
-        "') when called from retrieveCorrespondenceTable().\n",
-        "No SPARQL request was executed."
-      )
-    ))
-  }
-  
-  #-------------------------------
-  # 2b) Standardize schema & validate
-  #-------------------------------
-  names(ct_df) <- tolower(gsub("\\s+", ".", names(ct_df)))
-  # Map variants
-  if ("id" %in% names(ct_df) && !"id_table" %in% names(ct_df)) {
-    ct_df$id_table <- ct_df$id
-  }
-  if ("table.name" %in% names(ct_df) && !"table_name" %in% names(ct_df)) {
-    ct_df$table_name <- ct_df[["table.name"]]
-  }
-  # Validate
-  required <- c("prefix", "id_table")
-  missing  <- setdiff(required, names(ct_df))
-  if (length(missing)) {
-    stop(simpleError(
-      paste0(
-        "Result of correspondenceTableList('", endpoint,
-        "') is missing columns: ", paste(missing, collapse = ", "), ".\n",
-        "No SPARQL request was executed from retrieveCorrespondenceTable()."
-      )
-    ))
-  }
-  
-  # Case-insensitive match on prefix + exact match on ID_table
-  match_row <- which(
-    tolower(ct_df$prefix) == tolower(prefix) &
-      ct_df$id_table == ID_table
-  )
-  if (length(match_row) == 0L) {
-    stop(simpleError(
-      paste0(
-        "The combination (prefix = '", prefix, "', ID_table = '", ID_table,
-        "') is not available for endpoint '", endpoint,
-        "' according to correspondenceTableList().\n",
-        "No SPARQL request was executed."
-      )
-    ))
-  }
-  match_row <- match_row[1]
-  
-  # Authoritative URI, if available
-  corr_uri <- NULL
-  if ("uri" %in% names(ct_df)) {
-    corr_uri <- ct_df$uri[match_row]
-    if (!is.character(corr_uri) || is.na(corr_uri) || !nzchar(trimws(corr_uri))) {
-      corr_uri <- NULL
-    }
-  }
-  
-  #-------------------------------
-  # 3) Derive A and B from ID_table
-  #-------------------------------
-  ID_table_temp <- gsub("-", "_", ID_table)
-  ID_table_temp <- gsub("__", "_", ID_table_temp, fixed = TRUE)
-  A <- sub("_.*", "", ID_table_temp)
-  B <- sub(".*_", "", ID_table_temp)
-  
-  #-------------------------------
-  # 4) SPARQL prefixes
-  #-------------------------------
-  prefixlist <- prefixList(endpoint, prefix = tolower(c(A, B)))
-  prefixlist <- as.character(paste(prefixlist, collapse = "\n"))
-  
-  #-------------------------------
-  # 5) Build SPARQL query
-  #   - Anchor to <URI> if known; otherwise use prefix:ID_table
-  #   - Make Target-related triples fully OPTIONAL
-  #   - Use COALESCE(prefLabel, altLabel) for better label coverage
-  #-------------------------------
-  anchor <- if (!is.null(corr_uri)) paste0("<", corr_uri, ">") else paste0(prefix, ":", ID_table)
-  
-  SPARQL.query_0 <- paste0(
-    prefixlist, "\n",
-    "SELECT ?", A, " ?", B, " ?Label_", A, " ?Label_", B,
-    " ?Include_", A, " ?Exclude_", A,
-    " ?Include_", B, " ?Exclude_", B,
-    " ?Comment ?URL ?Sourcedatatype ?Targetdatatype\n",
-    "WHERE {\n",
-    "  ", anchor, " xkos:madeOf ?Associations .\n",
-    "  ?Associations xkos:sourceConcept ?Source .\n",
-    "  OPTIONAL { ?Associations xkos:targetConcept ?Target . }\n",
-    "  OPTIONAL { ?Associations rdfs:comment ?Comment . }\n",
-    "\n",
-    "  # Source (mandatory)\n",
-    "  ?Source skos:notation ?SourceNotation .\n",
-    "  OPTIONAL { ?Source skos:prefLabel ?PrefA FILTER (LANG(?PrefA) = '", language, "') }\n",
-    "  OPTIONAL { ?Source skos:altLabel  ?AltA  FILTER (LANG(?AltA)  = '", language, "') }\n",
-    "  OPTIONAL { ?Source skos:scopeNote      ?Include_", A, " FILTER (LANG(?Include_", A, ") = '", language, "') }\n",
-    "  OPTIONAL { ?Source xkos:exclusionNote  ?Exclude_", A, " FILTER (LANG(?Exclude_", A, ") = '", language, "') }\n",
-    "  BIND (COALESCE(?AltA, ?PrefA) AS ?Label_", A, ")\n",
-    "\n",
-    "  # Target (fully optional)\n",
-    "  OPTIONAL {\n",
-    "    ?Target skos:notation ?TargetNotation .\n",
-    "    OPTIONAL { ?Target skos:prefLabel ?PrefB FILTER (LANG(?PrefB) = '", language, "') }\n",
-    "    OPTIONAL { ?Target skos:altLabel  ?AltB  FILTER (LANG(?AltB)  = '", language, "') }\n",
-    "    OPTIONAL { ?Target skos:scopeNote     ?Include_", B, " FILTER (LANG(?Include_", B, ") = '", language, "') }\n",
-    "    OPTIONAL { ?Target xkos:exclusionNote ?Exclude_", B, " FILTER (LANG(?Exclude_", B, ") = '", language, "') }\n",
-    "    BIND (COALESCE(?AltB, ?PrefB) AS ?Label_", B, ")\n",
-    "    BIND (STR(?TargetNotation) AS ?", B, ")\n",
-    "    BIND (datatype(?TargetNotation) AS ?Targetdatatype)\n",
-    "  }\n",
-    "\n",
-    "  # URL + source bindings\n",
-    "  BIND (STR(?Associations)   AS ?URL)\n",
-    "  BIND (STR(?SourceNotation) AS ?", A, ")\n",
-    "  BIND (datatype(?SourceNotation) AS ?Sourcedatatype)\n"
-  )
-  
-  SPARQL.query_end <- paste0(
-    "}\n",
-    "ORDER BY ?", A, "\n"
-  )
-  
-  SPARQL.query <- paste0(SPARQL.query_0, SPARQL.query_end)
-  
-  #-------------------------------
-  # 6) Execute SPARQL
-  #-------------------------------
-  response <- httr::POST(
-    url    = endpoint_url,
-    httr::accept("text/csv"),
-    body   = list(query = SPARQL.query),
-    encode = "form",
-    httr::user_agent("correspondenceTables (R)")
-  )
-  httr::stop_for_status(response)
-  
-  csv_text <- httr::content(response, as = "text", encoding = "UTF-8")
-  data <- if (nzchar(csv_text)) {
-    utils::read.csv(textConnection(csv_text), stringsAsFactors = FALSE)
-  } else {
-    data.frame()
-  }
-  
-  #-------------------------------
-  # 7) Post-processing & return
-  #-------------------------------
-  # Drop datatype columns if present as last two
-  if (ncol(data) >= 2L &&
-      all(tail(names(data), 2L) %in% c("Sourcedatatype", "Targetdatatype"))) {
-    data <- data[, 1:(ncol(data) - 2L), drop = FALSE]
-  }
-  
-  # Clean newlines in character columns
-  data[] <- lapply(data, function(x) if (is.character(x)) gsub("\n", " ", x) else x)
-  
-  # CSV export
-  if (identical(CSVout, TRUE)) {
-    name_csv <- paste0(ID_table, "_table.csv")
-    utils::write.csv(data, file = name_csv, row.names = FALSE)
-    message("The correspondence table was saved in ", file.path(getwd(), name_csv))
-  } else if (is.character(CSVout)) {
-    utils::write.csv(data, file = CSVout, row.names = FALSE)
-    message("The table was saved in ", CSVout)
-  }
-  
-  # Output
-  if (isTRUE(showQuery)) {
-    result <- list(
-      SPARQL.query        = SPARQL.query,
-      CorrespondenceTable = data
+    path <- system.file(
+      "extdata",
+      paste0("correspondenceTableList_", endpoint, ".csv"),
+      package = "correspondenceTables"
     )
-    cat(result$SPARQL.query, sep = "\n")
-    return(result)
+    if (!file.exists(path)) {
+      stop(simpleError(paste0(
+        "Error in correspondenceTableList('", endpoint, "'): ",
+        "expected local CSV at ", path, " but it was not found."
+      )))
+    }
+    df <- utils::read.csv(path, stringsAsFactors = FALSE)
+    return(df)
+  }
+  
+  # ---------- Online mode ----------
+  cfg <- tryCatch(
+    jsonlite::fromJSON(
+      "https://raw.githubusercontent.com/eurostat/correspondenceTables/refs/heads/main/inst/extdata/endpoint_source_config.json"
+    ),
+    error = function(e) NULL
+  )
+  default_endpoints <- list(
+    CELLAR = "https://publications.europa.eu/webapi/rdf/sparql",
+    FAO    = "https://caliper.integratedmodelling.org/caliper/sparql/"
+  )
+  
+  # Helper to run one endpoint
+  run_one <- function(ep) {
+    src <- if (!is.null(cfg) && !is.null(cfg[[ep]])) cfg[[ep]] else default_endpoints[[ep]]
+    
+    # ---- 1) Get the catalog of schemes ----
+    schemes <- tryCatch(
+      classificationList(endpoint = ep),
+      error = function(e) {
+        stop(simpleError(paste0(
+          "Error in correspondenceTableList('", ep, "'): classificationList() failed.\n",
+          "Original error: ", conditionMessage(e)
+        )))
+      }
+    )
+    
+    if (!is.data.frame(schemes) || nrow(schemes) == 0L) {
+      return(data.frame(
+        Prefix                 = character(),
+        ID                     = character(),
+        Source.Classification  = character(),
+        Target.Classification  = character(),
+        Table.Name             = character(),
+        URI                    = character(),
+        stringsAsFactors       = FALSE
+      ))
+    }
+    
+    # ---- 2) Extract scheme URIs ----
+    uri_cols <- intersect(names(schemes),
+                          c("SchemeURI","ConceptSchemeURI","Scheme",
+                            "Concept.Scheme.URI","Concept.Scheme","URI"))
+    has_ns_cs <- all(c("Namespace","ConceptScheme") %in% names(schemes))
+    
+    get_scheme_uri <- function(row) {
+      for (nm in uri_cols) {
+        v <- row[[nm]]
+        if (is.character(v) && length(v) == 1L && grepl("^https?://", v)) return(v)
+      }
+      if (has_ns_cs) {
+        ns <- row[["Namespace"]]
+        cs <- row[["ConceptScheme"]]
+        if (is.character(ns) && is.character(cs) &&
+            nzchar(ns) && nzchar(cs) && grepl("^https?://", ns)) {
+          ns2 <- if (endsWith(ns, "/")) ns else paste0(ns, "/")
+          return(paste0(ns2, cs, "/scheme"))
+        }
+      }
+      NA_character_
+    }
+    
+    scheme_uri <- vapply(seq_len(nrow(schemes)),
+                         function(i) get_scheme_uri(schemes[i, , drop = FALSE]),
+                         character(1))
+    scheme_uri <- unique(scheme_uri[!is.na(scheme_uri) & nzchar(scheme_uri)])
+    
+    if (length(scheme_uri) == 0L) {
+      stop(simpleError(paste0(
+        "Error in correspondenceTableList('", ep, "'): ",
+        "classificationList() did not provide any scheme URIs to filter correspondences."
+      )))
+    }
+    
+    # Map SchemeURI -> Prefix
+    prefix_map <- list()
+    if ("Prefix" %in% names(schemes)) {
+      idx <- match(scheme_uri, vapply(seq_len(nrow(schemes)),
+                                      function(i) get_scheme_uri(schemes[i, , drop = FALSE]),
+                                      character(1)))
+      prefix_map <- stats::setNames(schemes$Prefix[idx], scheme_uri)
+    } else {
+      prefix_map <- stats::setNames(rep("", length(scheme_uri)), scheme_uri)
+    }
+    
+    # ---- 3) Build relaxed query + chunked VALUES + fallback ----
+    make_values <- function(uris) {
+      paste0("VALUES ?KnownScheme { ", paste(sprintf("<%s>", uris), collapse = " "), " }")
+    }
+    prefix_header <- paste(
+      "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>",
+      "PREFIX xkos: <http://rdf-vocabulary.ddialliance.org/xkos#>",
+      sep = "\n"
+    )
+    
+    # Run the relaxed query in chunks to avoid overly long VALUES
+    values_chunk_size <- 200L
+    n <- length(scheme_uri)
+    chunk_starts <- seq(1L, n, by = values_chunk_size)
+    dfs <- list()
+    
+    for (cs in chunk_starts) {
+      ce <- min(cs + values_chunk_size - 1L, n)
+      uris_chunk <- scheme_uri[cs:ce]
+      values_block <- make_values(uris_chunk)
+      
+      ### FAO: query che estrae i token dagli URI (niente inScheme/inCorrespondence)
+      if (ep == "FAO") {
+        SPARQL.query <- paste0(
+          prefix_header, "\n",
+          "SELECT DISTINCT ?corr ?Label ?srcTok ?tgtTok\n",
+          "WHERE {\n",
+          "  ?corr a xkos:Correspondence .\n",
+          "  OPTIONAL { ?corr skos:prefLabel ?Label . }\n",
+          "  # ID = basename(URI)\n",
+          "  BIND(REPLACE(STR(?corr), \".*/\", \"\") AS ?_id)\n",
+          "  # srcTok = parte sinistra di '--' oppure, se assente, prima di '-'\n",
+          "  BIND(IF(CONTAINS(?_id, \"--\"), REPLACE(?_id, \"^(.+?)--.+$\", \"$1\"), REPLACE(?_id, \"^(.+?)-.+$\", \"$1\")) AS ?srcTok)\n",
+          "  # tgtTok = parte destra\n",
+          "  BIND(IF(CONTAINS(?_id, \"--\"), REPLACE(?_id, \"^.+?--(.+)$\", \"$1\"), REPLACE(?_id, \"^.+?-(.+)$\", \"$1\")) AS ?tgtTok)\n",
+          "}\n"
+        )
+      } else {
+        # CELLAR: query originale
+        SPARQL.query <- paste0(
+          prefix_header, "\n",
+          "SELECT DISTINCT ?corr ?Label ?srcScheme ?tgtScheme\n",
+          "WHERE {\n",
+          "  ", values_block, "\n",
+          "  ?corr a xkos:Correspondence .\n",
+          "  OPTIONAL { ?corr skos:prefLabel ?Label . }\n",
+          "  OPTIONAL {\n",
+          "    ?assoc xkos:inCorrespondence ?corr .\n",
+          "    OPTIONAL { ?assoc xkos:sourceConcept ?src . ?src skos:inScheme ?srcScheme . }\n",
+          "    OPTIONAL { ?assoc xkos:targetConcept ?tgt . ?tgt skos:inScheme ?tgtScheme . }\n",
+          "  }\n",
+          "}\n"
+        )
+      }
+      
+      if (isTRUE(showQuery)) {
+        message("SPARQL query for endpoint = ", ep, " [chunk ", cs, "-", ce, "]:\n", SPARQL.query)
+      }
+      
+      df_chunk <- tryCatch({
+        resp <- httr::POST(
+          url   = src,
+          httr::accept("text/csv"),
+          body  = list(query = SPARQL.query),
+          encode = "form"
+        )
+        utils::read.csv(text = httr::content(resp, "text"), stringsAsFactors = FALSE)
+      }, error = function(e) {
+        stop(simpleError(paste0(
+          "Error in correspondenceTableList('", ep, "'): SPARQL request failed.\n",
+          "Original error: ", conditionMessage(e)
+        )))
+      })
+      
+      if (nrow(df_chunk)) dfs[[length(dfs) + 1L]] <- df_chunk
+    }
+    
+    # If all chunked queries returned empty, try a minimal fallback without VALUES
+    if (length(dfs) == 0L) {
+      SPARQL.fallback <- if (ep == "FAO") {
+        paste0(
+          prefix_header, "\n",
+          "SELECT DISTINCT ?corr ?Label ?srcTok ?tgtTok\n",
+          "WHERE {\n",
+          "  ?corr a xkos:Correspondence .\n",
+          "  OPTIONAL { ?corr skos:prefLabel ?Label . }\n",
+          "  BIND(REPLACE(STR(?corr), \".*/\", \"\") AS ?_id)\n",
+          "  BIND(IF(CONTAINS(?_id, \"--\"), REPLACE(?_id, \"^(.+?)--.+$\", \"$1\"), REPLACE(?_id, \"^(.+?)-.+$\", \"$1\")) AS ?srcTok)\n",
+          "  BIND(IF(CONTAINS(?_id, \"--\"), REPLACE(?_id, \"^.+?--(.+)$\", \"$1\"), REPLACE(?_id, \"^.+?-(.+)$\", \"$1\")) AS ?tgtTok)\n",
+          "}\n"
+        )
+      } else {
+        paste0(
+          prefix_header, "\n",
+          "SELECT DISTINCT ?corr ?Label\n",
+          "WHERE {\n",
+          "  ?corr a xkos:Correspondence .\n",
+          "  OPTIONAL { ?corr skos:prefLabel ?Label . }\n",
+          "}\n"
+        )
+      }
+      if (isTRUE(showQuery)) {
+        message("Fallback SPARQL query for endpoint = ", ep, ":\n", SPARQL.fallback)
+      }
+      resp2 <- httr::POST(src, httr::accept("text/csv"),
+                          body = list(query = SPARQL.fallback), encode = "form")
+      df <- utils::read.csv(text = httr::content(resp2, "text"), stringsAsFactors = FALSE)
+    } else {
+      # Bind chunked results
+      df <- dfs[[1L]]
+      if (length(dfs) > 1L) {
+        for (k in 2:length(dfs)) {
+          df <- tryCatch(
+            {
+              base::rbind(df, dfs[[k]])
+            },
+            error = function(e) {
+              # different column orders: align names
+              common <- intersect(names(df), names(dfs[[k]]))
+              base::rbind(df[, common, drop = FALSE], dfs[[k]][, common, drop = FALSE])
+            }
+          )
+        }
+      }
+    }
+    
+    # Normalize expected columns
+    for (nm in c("corr","Label","srcScheme","tgtScheme","srcTok","tgtTok")) {
+      if (!nm %in% names(df)) df[[nm]] <- ""
+    }
+    
+    # ---- 4) Best-effort inference (tua logica originale) ----
+    schemes$ConceptToken <- NA_character_
+    if ("ConceptScheme" %in% names(schemes) && is.character(schemes$ConceptScheme)) {
+      schemes$ConceptToken <- schemes$ConceptScheme
+    } else if ("URI" %in% names(schemes) && is.character(schemes$URI)) {
+      schemes$ConceptToken <- sub(".*/", "", schemes$URI)
+    }
+    
+    scheme_uri_col <- if ("URI" %in% names(schemes)) {
+      schemes$URI
+    } else if ("SchemeURI" %in% names(schemes)) {
+      schemes$SchemeURI
+    } else if ("ConceptSchemeURI" %in% names(schemes)) {
+      schemes$ConceptSchemeURI
+    } else {
+      rep(NA_character_, nrow(schemes))
+    }
+    scheme_lookup <- stats::setNames(scheme_uri_col, schemes$ConceptToken)
+    
+    infer_scheme_from_text <- function(txt) {
+      if (!is.character(txt) || !nzchar(txt)) return(character(0))
+      toks <- names(scheme_lookup)
+      toks <- toks[!is.na(toks) & nzchar(toks)]
+      hits <- toks[vapply(toks, function(tk) grepl(tk, txt, fixed = TRUE), logical(1))]
+      unique(unname(scheme_lookup[hits]))
+    }
+    
+    is_empty <- function(x) { is.na(x) | !nzchar(x) }
+    if (nrow(df)) {
+      for (i in seq_len(nrow(df))) {
+        if (is_empty(df$srcScheme[i]) || is_empty(df$tgtScheme[i])) {
+          s_uri <- infer_scheme_from_text(df$corr[i])
+          s_lab <- infer_scheme_from_text(df$Label[i])
+          inferred <- unique(c(s_uri, s_lab))
+          if (length(inferred) >= 1L && is_empty(df$srcScheme[i])) df$srcScheme[i] <- inferred[1L]
+          if (length(inferred) >= 2L && is_empty(df$tgtScheme[i])) df$tgtScheme[i] <- inferred[2L]
+        }
+      }
+    }
+    
+    # ---- 5) Build output with expected columns ----
+    pick_prefix <- function(src, tgt) {
+      if (!is.na(src) && nzchar(src) && src %in% names(prefix_map)) {
+        prefix_map[[src]]
+      } else if (!is.na(tgt) && nzchar(tgt) && tgt %in% names(prefix_map)) {
+        prefix_map[[tgt]]
+      } else {
+        ""
+      }
+    }
+    
+    out <- data.frame(
+      Prefix                 = mapply(pick_prefix, df$srcScheme, df$tgtScheme, USE.NAMES = FALSE),
+      ID                     = sub(".*/", "", df$corr),
+      Source.Classification  = ifelse(is.na(df$srcScheme), "", df$srcScheme),
+      Target.Classification  = ifelse(is.na(df$tgtScheme), "", df$tgtScheme),
+      Table.Name             = ifelse(is.na(df$Label), "", df$Label),
+      URI                    = ifelse(is.na(df$corr), "", df$corr),
+      stringsAsFactors       = FALSE
+    ) 
+    
+    # ### FAO: se Prefix è ancora vuoto, riempilo dai token estratti
+    if (ep == "FAO" && nrow(df)) {
+      to_pref <- function(tok) {
+        tok <- tolower(trimws(tok))
+        tok <- gsub("[^a-z0-9]+", "", tok)     # rimuove separatori
+        tok <- gsub("^icc(v)?([0-9]+)$", "icc\\2", tok)
+        tok <- gsub("^isic(v)?([0-9]+)$", "isic\\2", tok)
+        tok <- gsub("^cpc(v)?([0-9]+)$", "cpc\\2", tok)
+        tok
+      }
+      srcP <- to_pref(df$srcTok)
+      tgtP <- to_pref(df$tgtTok)
+      # scegliamo il prefisso del lato "sorgente" se presente, altrimenti quello "target"
+      prefTok <- ifelse(nzchar(srcP), srcP, tgtP)
+      empties <- which(!nzchar(out$Prefix))
+      if (length(empties)) {
+        out$Prefix[empties] <- prefTok[empties]
+      }
+    }
+    
+    # De-duplicate
+    out <- out[!duplicated(out), , drop = FALSE]
+    out
+  }
+  
+  if (endpoint == "ALL") {
+    return(list(
+      CELLAR = run_one("CELLAR"),
+      FAO    = run_one("FAO")
+    ))
   } else {
-    return(data)
+    return(run_one(endpoint))
   }
 }
-
-
-
-
