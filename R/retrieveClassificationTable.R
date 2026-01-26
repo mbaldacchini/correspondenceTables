@@ -1,412 +1,522 @@
-#' @title Retrieve a classification table from CELLAR or FAO
+
+#' @title Retrieve a full classification table from CELLAR or FAO
 #'
 #' @description
-#' Retrieves a full classification table (codes, labels, hierarchical
-#' relationships, and associated notes) from the CELLAR or FAO SPARQL
-#' repositories.
-#' The function supports optional filtering by hierarchical level and
-#' automatic use of local embedded data for vignette building.
+#' Retrieves the complete structure of a statistical classification published in  
+#' either CELLAR or FAO, using SKOS/XKOS semantics.  
 #'
-#' @param endpoint Character string specifying which SPARQL endpoint to query.
-#'   Must be one of:
-#'   \itemize{
-#'     \item \code{"CELLAR"}
-#'     \item \code{"FAO"}
-#'   }
-#'
-#' @param prefix Character string giving the namespace prefix associated
-#'   with the targeted classification scheme.
-#'   This value should match the \code{Prefix} column returned by
-#'   \code{\link{classificationList}} and is required to build:
-#'   \itemize{
-#'     \item the \code{PREFIX} declarations (via \code{prefixList}),
-#'     \item the fully-qualified scheme name (e.g. \code{prefix:conceptScheme}).
-#'   }
-#'
-#' @param conceptScheme Character string identifying the classification
-#'   scheme to retrieve, typically obtained from the
-#'   \code{ConceptScheme} column of \code{\link{classificationList}}.
-#'
-#' @param language Character string giving the language used for labels and
-#'   notes. Defaults to \code{"en"}.
-#'
-#' @param level Character string specifying which hierarchical level to
-#'   retrieve.
-#'   \itemize{
-#'     \item \code{"ALL"} (default): retrieve every level.
-#'     \item A numeric depth (e.g. \code{"1"}, \code{"2"}): retrieve only
-#'           that level.
-#'   }
-#'   If the classification has no defined levels (as detected by
-#'   \code{\link{dataStructure}}), the function automatically resets
-#'   \code{level = "ALL"} with a message.
-#'
-#' @param CSVout Boolean or character. Controls CSV export:
-#'   \itemize{
-#'     \item \code{NULL} (default): no export.
-#'     \item \code{TRUE}: export to a default filename based on
-#'           \code{prefix} and \code{language}.
-#'     \item character: explicit path to a CSV file.
-#'   }
-#'
-#' @param showQuery Boolean. If \code{TRUE} (default), returns a list
-#'   containing both the SPARQL query and the resulting table.
-#'   If \code{FALSE}, only the table (data frame) is returned.
-#'
-#' @details
-#' Behaviour depends on the global option \code{useLocalDataForVignettes}:
+#' The function:
 #' \itemize{
-#'   \item If \code{TRUE}:
-#'         the function searches for a local embedded CSV file (in
-#'         \code{inst/extdata}) matching the requested \code{prefix} and
-#'         \code{language}. If found, it is returned immediately and no
-#'         SPARQL call is made.
-#'
-#'   \item If \code{FALSE}:
-#'         the function:
-#'         \itemize{
-#'           \item builds SPARQL prefix declarations via \code{prefixList},
-#'           \item calls \code{\link{dataStructure}} to determine level
-#'                 availability and adjust \code{level} when necessary,
-#'           \item constructs and submits a SPARQL query to the selected
-#'                 endpoint,
-#'           \item returns the resulting classification table, optionally
-#'                 along with the query used.
-#'         }
+#'   \item resolves the full ConceptScheme URI associated with the classification,  
+#'         through endpoint‑aware matching, ASK‑based validation, and SPARQL discovery;
+#'   \item anchors the extraction on the validated scheme URI;
+#'   \item retrieves all concepts belonging to the scheme and their metadata;
+#'   \item aggregates labels, hierarchical relations, inclusion/exclusion notes,  
+#'         and optional depth information;
+#'   \item returns one row per concept.
 #' }
 #'
-#' Clear, user-friendly errors are raised if:
-#' \itemize{
-#'   \item the endpoint is unreachable,
-#'   \item the classification does not provide the requested level,
-#'   \item \code{dataStructure()} indicates missing or invalid structure information,
-#'   \item the SPARQL response is malformed.
-#' }
+#' The resulting table is suitable for classification browsing, integrity checks,  
+#' hierarchical analysis, documentation, and downstream correspondence mapping.
+#'
+#' @param endpoint Character. Repository to query. Must be either  
+#'   \code{"CELLAR"} or \code{"FAO"}.
+#'
+#' @param prefix Character. Classification prefix used for matching and URI resolution  
+#'   (e.g. \code{"cn2022"}, \code{"cpc21"}, \code{"isic4"}).
+#'
+#' @param conceptScheme Character. Local identifier of the scheme  
+#'   (often identical to \code{prefix}). The function automatically resolves this  
+#'   to the canonical ConceptScheme URI published in the endpoint.
+#'
+#' @param language Character. Desired language for labels, scope notes and exclusion notes.  
+#'   Default: \code{"en"}.
+#'
+#' @param level Character.  
+#'   \itemize{
+#'     \item \code{"ALL"} (default): return all levels in the hierarchy;
+#'     \item a specific depth value (e.g. \code{"2"}) to filter concepts at that depth only.
+#'   }
+#'
+#' @param CSVout Logical or character.  
+#'   \itemize{
+#'     \item \code{NULL}: do not export;  
+#'     \item \code{TRUE}: export automatically to  
+#'       \verb{<prefix>_<scheme>_<language>_classification.csv};  
+#'     \item character: export to the provided filepath.
+#'   }
+#'
+#' @param showQuery Logical.  
+#'   \itemize{
+#'     \item \code{FALSE} (default): return only the classification table;  
+#'     \item \code{TRUE}: return a list containing the SPARQL query,  
+#'           the resolved scheme URI, and the table itself.
+#'   }
+#'
+#' @param knownSchemes Optional. A data frame supplying authoritative mappings  
+#'   of the form \code{Prefix, ConceptScheme, URI[, Endpoint]}.  
+#'   When provided, this overrides automatic discovery. To be obtained using \code{classificationList(endpoint)}.
+#'
+#' @param preferMappingOnly Logical.  
+#'   If \code{TRUE}, the function *never* attempts SPARQL discovery and  
+#'   uses only information in \code{knownSchemes} or \code{classificationList(endpoint)}.  
+#'   Default: \code{FALSE}.
+#'
 #'
 #' @return
-#' If \code{showQuery = TRUE} (default), returns a list with:
+#' If \code{showQuery = FALSE}, returns a \code{data.frame} with one row per concept  
+#' and the following columns:
+#'
 #' \itemize{
-#'   \item \code{SPARQL.query}: the full SPARQL query as a character string,
-#'   \item \code{ClassificationTable}: a data frame containing the retrieved
-#'         classification table.
+#'
+#'   \item \strong{Concept}  
+#'         Full URI of the concept node.
+#'
+#'   \item \strong{Code}  
+#'         Notation/code of the concept (\code{skos:notation}), coerced to string.
+#'
+#'   \item \strong{Label}  
+#'         Human‑readable label of the concept in the requested language  
+#'         (via \code{skos:prefLabel} or \code{skos:altLabel}, combined with COALESCE).
+#'
+#'   \item \strong{Depth}  
+#'         Depth level in the classification hierarchy (\code{xkos:depth}),  
+#'         when published.
+#'
+#'   \item \strong{BroaderList}  
+#'         Concatenated list of broader concepts (URIs), separated by \code{" | "}.
+#'
+#'   \item \strong{BroaderCodeList}  
+#'         Concatenated list of broader concept notations, aligned with \code{BroaderList}.
+#'
+#'   \item \strong{IncludeNotes}  
+#'         Concatenated \code{skos:scopeNote} values describing what is *included*  
+#'         in the meaning of the concept.
+#'
+#'   \item \strong{ExcludeNotes}  
+#?         Concatenated \code{xkos:exclusionNote} values describing what is  
+#'         *excluded* from the meaning of the concept.
+#'
 #' }
 #'
-#' If \code{showQuery = FALSE}, only the classification table is returned.
+#' If \code{showQuery = TRUE}, returns a list:
+#' \itemize{
+#'   \item \code{SPARQL.query} – the executed SPARQL string;
+#'   \item \code{scheme_uri} – the resolved ConceptScheme URI;
+#'   \item \code{ClassificationTable} – the data.frame described above.
+#' }
+#'
+#'
 #'
 #' @examples
 #' \dontrun{
-#'   endpoint <- "CELLAR"
-#'   prefix <- "cn2022"
-#'   conceptScheme <- "cn2022"
+#' # Retrieve full CN2022 classification (English)
+#' cn <- retrieveClassificationTable(
+#'   endpoint      = "CELLAR",
+#'   prefix        = "cn2022",
+#'   conceptScheme = "cn2022",
+#'   language      = "en"
+#' )
 #'
-#'   res <- tryCatch(
-#'     retrieveClassificationTable(
-#'       endpoint      = endpoint,
-#'       prefix        = prefix,
-#'       conceptScheme = conceptScheme,
-#'       language      = "en",
-#'       level         = "ALL"
-#'     ),
-#'     error = function(e) {
-#'       message("SPARQL query failed: ", e$message)
-#'       NULL
-#'     }
-#'   )
-#'
-#'   if (!is.null(res)) {
-#'     cat(res$SPARQL.query)
-#'     head(res$ClassificationTable)
-#'   }
+#' # Retrieve CPC v2.1 from FAO and inspect query
+#' out <- retrieveClassificationTable(
+#'   endpoint      = "FAO",
+#'   prefix        = "cpc21",
+#'   conceptScheme = "cpc21",
+#'   showQuery     = TRUE
+#' )
+#' cat(out$SPARQL.query)
 #' }
 #'
+#' @import httr
+#' @export
 
 
-retrieveClassificationTable = function(endpoint,
-                                       prefix,
-                                       conceptScheme,
-                                       language = "en",
-                                       level = "ALL",
-                                       CSVout = NULL,
-                                       showQuery = FALSE
-                                       ){
-  # Check correctness of endpoint argument
-  endpoint <- toupper(endpoint)
-  if (!endpoint %in% c("CELLAR", "FAO")) {
-    stop("`endpoint` must be either 'CELLAR' or 'FAO'.")
+#  Main function ---------------------------
+
+retrieveClassificationTable <- function(endpoint,
+                                        prefix,
+                                        conceptScheme,
+                                        language  = "en",
+                                        level     = "ALL",
+                                        CSVout    = NULL,
+                                        showQuery = FALSE,
+                                        knownSchemes = NULL,
+                                        preferMappingOnly = FALSE) {
+  endpoint <- toupper(trimws(endpoint))
+  if (!endpoint %in% c("CELLAR", "FAO")) stop("`endpoint` must be 'CELLAR' or 'FAO'.")
+  prefix        <- trimws(prefix)
+  conceptScheme <- trimws(conceptScheme)
+  level         <- trimws(level)
+  
+  # Local data branch (optional, unchanged)
+  if (isTRUE(getOption("useLocalDataForVignettes", FALSE))) {
+    localDataPath <- system.file("extdata", paste0(prefix, "_", language, ".csv"), package = "correspondenceTables")
+    if (nzchar(localDataPath) && file.exists(localDataPath)) {
+      data <- utils::read.csv(localDataPath, stringsAsFactors = FALSE)
+      if (!identical(toupper(level), "ALL") && "Depth" %in% names(data)) {
+        data <- subset(data, as.character(Depth) == level)
+      }
+      return(if (isTRUE(showQuery))
+        list(SPARQL.query = NA_character_, ClassificationTable = data)
+        else data)
+    }
   }
   
-  #-----------------------------------------------------------
-  # 1. Local data branch (for vignettes / offline use)
-  #-----------------------------------------------------------
-  if (getOption("useLocalDataForVignettes", FALSE)) {
-    localDataPath <- system.file(
-      "extdata",
-      paste0(prefix, "_", language, ".csv"),
-      package = "correspondenceTables"
-    )
-    
-    if (file.exists(localDataPath)) {
-      data <- read.csv(localDataPath, stringsAsFactors = FALSE)
-      
-      # Optional level filtering on local data
-      if (level != "ALL") {
-        data <- data[nchar(gsub("\\.", "", data[[prefix]])) == as.numeric(level), ]
-      }
-      
-      if (showQuery) {
-        print("Data loaded from local file.")
-      }
-      return(data)
-    }
+  # SPARQL endpoint
+  endpoint_url <- if (endpoint == "CELLAR") {
+    "http://publications.europa.eu/webapi/rdf/sparql"
   } else {
-    
-    #-----------------------------------------------------------
-    # 2. Endpoint configuration + prefixes
-    #-----------------------------------------------------------
-    tryCatch(
-      {
-        # Try to load endpoint configuration from GitHub
-        config <- tryCatch(
-          jsonlite::fromJSON(
-            "https://raw.githubusercontent.com/eurostat/correspondenceTables/main/inst/extdata/endpoint_source_config.json"
-          ),
-          error = function(e) NULL
-        )
-        
-        # Default hardcoded endpoints
-        default_endpoints <- list(
-          CELLAR = "http://publications.europa.eu/webapi/rdf/sparql",
-          FAO    = "https://stats.fao.org/caliper/sparql/AllVocs"
-        )
-        
-        # Select source endpoint
-        if (!is.null(config) && !is.null(config[[endpoint]])) {
-          source <- config[[endpoint]]
-        } else {
-          source <- default_endpoints[[endpoint]]
-        }
-        
-        # URL base (for information only)
-        if (endpoint == "CELLAR") url <- "data.europa.eu/"
-        if (endpoint == "FAO")    url <- "unstats.un.org/"
-        
-        # Load prefixes using prefixList()
-        prefixlist <- prefixList(endpoint, prefix = prefix)
-        prefixlist <- as.character(paste(prefixlist, collapse = "\n"))
-        
-      }, error = function(e) {
-        stop(simpleError(
-          paste(
-            "Error in function retrieveClassificationTable:",
-            "building of the SPARQL query failed",
-            endpoint, "is not available or is returning unexpected data."
-          )
-        ))
-      }
-    )
-    
-    #-----------------------------------------------------------
-    # 3. QTM requirement: run dataStructure() BEFORE SPARQL
-    #-----------------------------------------------------------
-    dt_level <- tryCatch(
-      suppressMessages(
-        dataStructure(endpoint, prefix, conceptScheme, language)
-      ),
-      error = function(e) {
-        stop(simpleError(
-          paste0(
-            "Error in retrieveClassificationTable(): dataStructure() failed for ",
-            "endpoint = '", endpoint, "', prefix = '", prefix,
-            "', conceptScheme = '", conceptScheme, "', language = '", language, "'.\n",
-            "Original error from dataStructure(): ", conditionMessage(e), "\n",
-            "No SPARQL request was executed."
-          )
-        ))
-      }
-    )
-    
-    # ---- Case A: classification has NO levels ----
-    if (nrow(dt_level) == 0L) {
-      if (level != "ALL") {
-        stop(simpleError(
-          paste0(
-            "Classification '", conceptScheme,
-            "' has no level information, but a specific level ('", level,
-            "') was requested.\n",
-            "Level filtering cannot be applied. No SPARQL request was executed."
-          )
-        ))
-      }
-      # level == "ALL" we proceed without level filter
-    }
-    
-    # ---- Case B: classification HAS levels & level != ALL ----
-    if (nrow(dt_level) > 0L && level != "ALL") {
-      # Depth is numeric in dt_level; level is character
-      level_num <- suppressWarnings(as.numeric(level))
-      
-      if (is.na(level_num)) {
-        stop(simpleError(
-          paste0(
-            "The requested level '", level,
-            "' is not numeric. Only numeric levels (e.g. '1', '2', '3') are allowed.\n",
-            "No SPARQL request was executed."
-          )
-        ))
-      }
-      
-      available_levels <- unique(dt_level$Depth)
-      
-      if (!(level_num %in% available_levels)) {
-        stop(simpleError(
-          paste0(
-            "Requested level '", level_num, "' does not exist for classification '",
-            conceptScheme, "'.\nAvailable levels are: ",
-            paste(sort(available_levels), collapse = ", "), ".\n",
-            "No SPARQL request was executed."
-          )
-        ))
-      }
-    }
-    
-    #-----------------------------------------------------------
-    # 4. Build and execute SPARQL query (only if all checks passed)
-    #-----------------------------------------------------------
-    tryCatch(
-      {
-        # Base query (all levels)
-        SPARQL.query_0 <- paste0(
-          prefixlist, "
-        SELECT DISTINCT ?", prefix, " ?Name ?Level ?Parent ?Include ?Include_Also ?Exclude ?URL
-
-        WHERE {
-            ?s skos:altLabel ?Label ;
-                skos:inScheme ?Scheme ;
-                ^skos:member ?Member ;
-                skos:notation ?notation .
-            OPTIONAL {
-              ?s skos:broader ?Broader .
-              ?Broader skos:notation ?BT_Notation .
-            }
-            BIND (STR(?BT_Notation) as ?Parent)
-            FILTER (?Scheme = ", prefix, ":", conceptScheme, ")
-            FILTER (lang(?Label) = '", language, "')
-
-            BIND (STR(?s)          AS ?URL)
-            BIND (STR(?notation)   AS ?", prefix, " )
-            BIND (STR(?Label)      AS ?Name)
-
-            ?Member a xkos:ClassificationLevel ;
-                    xkos:depth ?Depth ;
-                    xkos:organizedBy ?L .
-            ?L skos:prefLabel ?Level_Name .
-            FILTER (LANG(?Level_Name)= '", language, "')
-            BIND (STR(?Level_Name) AS ?LEVEL_S )
-            BIND (STR(?Depth)      AS ?Level )
-
-            OPTIONAL {?s skos:scopeNote ?Include .
-                      FILTER (LANG(?Include) = '", language, "') .}
-            OPTIONAL {?s xkos:exclusionNote ?Exclude .
-                      FILTER (LANG(?Exclude) = '", language, "').}
-            OPTIONAL {?s xkos:additionalContentNote ?Include_Also .
-                      FILTER (LANG(?Include_Also) = '", language, "').}
-        "
-        )
-        
-        # Filter on Depth if a specific level was requested
-        SPARQL.query_level <- paste0("FILTER (?Depth = ", level, ")")
-        
-        # Closing part
-        SPARQL.query_end <- paste0(
-          "}
-          ORDER BY ?", prefix
-        )
-        
-        if (length(level) == 0L) {
-          stop("Classification level was not specified.")
-        } else {
-          if (level == "ALL") {
-            SPARQL.query <- paste0(SPARQL.query_0, SPARQL.query_end)
-          } else {
-            SPARQL.query <- paste0(SPARQL.query_0, SPARQL.query_level, SPARQL.query_end)
-          }
-        }
-        
-        response <- httr::POST(
-          url   = source,
-          httr::accept("text/csv"),
-          body  = list(query = SPARQL.query),
-          encode = "form"
-        )
-        data <- data.frame(httr::content(response, show_col_types = FALSE))
-        
-      }, error = function(e) {
-        cat("The following SPARQL code was used in the call:\n", SPARQL.query, "\n")
-        message("The following response was given by the SPARQL call:")
-        message(paste(capture.output(str(response)), collapse = "\n"))
-        stop(simpleError(
-          "Error in function retrieveClassificationTable, SPARQL query execution failed."
-        ))
-      }
-    )
-    
-    #-----------------------------------------------------------
-    # 5. Post-processing: datatype + duplicates + corrections + CSV + output
-    #-----------------------------------------------------------
-    
-    # Keep only plainLiteral if multiple datatypes
-    type <- unique(data$datatype)
-    if (length(type) > 1L) {
-      data <- data[data$datatype ==
-                     "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral", ]
-    }
-    
-    # Remove datatype column
-    data <- data[, 1:(ncol(data) - 1), drop = FALSE]
-    
-    # Detect potential duplicate codes in the classification table
-    code_col <- prefix
-    key_cols <- c(code_col, "Name")
-    key_cols <- key_cols[key_cols %in% names(data)]
-    
-    dup <- 0L
-    if (length(key_cols) >= 1L) {
-      dup <- sum(duplicated(data[key_cols]))
-    }
-    
-    if (dup > 0L) {
-      warning("There are duplicated codes in the classification table.")
-    }
-    
-    # ---- NEW: apply correctionClassification() and warn if corrections applied ----
-    corrected <- ClassificationCorrection(data, prefix)
-    if (isTRUE(attr(corrected, "corrections_applied"))) {
-      warning(
-        "The raw SPARQL result contained inconsistencies that were corrected locally. ",
-        "The returned table may differ from the raw endpoint result."
-      )
-    }
-    data <- corrected
-    # -------------------------------------------------------------------------------
-    
-    # Clean line breaks
-    data <- lapply(data, function(x) gsub("\n", " ", x))
-    data <- as.data.frame(data, stringsAsFactors = FALSE)
-    
-    # Save results as CSV if requested
-    CsvFileSave(CSVout, data)
-    
-    # Prepare result
-    if (showQuery) {
-      result <- list(
-        SPARQL.query        = SPARQL.query,
-        ClassificationTable = data
-      )
-      cat(result$SPARQL.query, sep = "\n")
-    } else {
-      result <- data
-    }
-    
-    return(result)
+    "https://caliper.integratedmodelling.org/caliper/sparql"
   }
+  
+  # Scheme URI resolution (uses endpoint + optional external mapping)
+  scheme_uri <- .resolve_scheme_uri(
+    endpoint_url      = endpoint_url,
+    endpoint          = endpoint,
+    prefix            = prefix,
+    conceptScheme     = conceptScheme,
+    language          = language,
+    knownSchemes      = knownSchemes,      # optional data.frame (Prefix, ConceptScheme, URI[, Endpoint])
+    preferMappingOnly = preferMappingOnly  # TRUE = no discovery/fallback
+  )
+  if (!nzchar(scheme_uri)) {
+    stop(sprintf("Could not resolve ConceptScheme for prefix='%s' conceptScheme='%s' in %s.",
+                 prefix, conceptScheme, endpoint))
+  }
+  
+  # Presence check (extra robustness)
+  if (!isTRUE(.ask_scheme_exists(endpoint_url, scheme_uri))) {
+    stop(paste0("ConceptScheme not present in this endpoint: ", scheme_uri))
+  }
+  
+  # SPARQL prefix block
+  prefix_block <- paste(
+    "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>",
+    "PREFIX xkos: <http://rdf-vocabulary.ddialliance.org/xkos#>",
+    "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+    sep = "\n"
+  )
+  
+  # Optional depth filter (on base variable ?Depth0)
+  filter_depth_inner <- ""
+  if (!identical(toupper(level), "ALL")) {
+    filter_depth_inner <- paste0("FILTER (STR(?Depth0) = '", level, "')")
+  }
+  
+  # Compatible query (no subselect, no alias conflict, clean GROUP_CONCAT)
+  SPARQL.query <- paste0(
+    prefix_block, "\n",
+    "SELECT ?Concept\n",
+    "       (MIN(STR(?Notation)) AS ?Code)\n",
+    "       (SAMPLE(?Label0)     AS ?Label)\n",
+    "       (SAMPLE(?Depth0)     AS ?Depth)\n",
+    "       (GROUP_CONCAT(DISTINCT STR(?Broader);          separator=\" | \")  AS ?BroaderList)\n",
+    "       (GROUP_CONCAT(DISTINCT STR(?BroaderNotation);  separator=\" | \")  AS ?BroaderCodeList)\n",
+    "       (GROUP_CONCAT(DISTINCT ?Include;               separator=\" || \") AS ?IncludeNotes)\n",
+    "       (GROUP_CONCAT(DISTINCT ?Exclude;               separator=\" || \") AS ?ExcludeNotes)\n",
+    "WHERE {\n",
+    "  ?Concept a skos:Concept ; skos:inScheme <", scheme_uri, "> ; skos:notation ?Notation .\n",
+    "  OPTIONAL { ?Concept xkos:depth ?Depth0 }\n",
+    "  OPTIONAL { ?Concept skos:broader ?Broader .\n",
+    "             ?Broader skos:notation ?BroaderNotation }\n",
+    "  OPTIONAL { ?Concept skos:prefLabel ?Pref FILTER (LANG(?Pref) = '", language, "') }\n",
+    "  OPTIONAL { ?Concept skos:altLabel  ?Alt  FILTER (LANG(?Alt)  = '", language, "') }\n",
+    "  BIND (COALESCE(?Pref, ?Alt) AS ?Label0)\n",
+    "  OPTIONAL { ?Concept skos:scopeNote     ?Include FILTER (LANG(?Include) = '", language, "') }\n",
+    "  OPTIONAL { ?Concept xkos:exclusionNote ?Exclude FILTER (LANG(?Exclude) = '", language, "') }\n",
+    if (nzchar(filter_depth_inner)) paste0("  ", filter_depth_inner, "\n") else "",
+    "}\n",
+    "GROUP BY ?Concept\n",
+    "ORDER BY ?Code\n"
+  )
+  
+  # Execution: try POST forcing CSV, fallback to GET if needed
+  resp <- httr::POST(
+    url    = endpoint_url,
+    body   = list(query = SPARQL.query, format = "text/csv"),
+    encode = "form",
+    httr::accept("text/csv"),
+    httr::user_agent("correspondenceTables (R)")
+  )
+  
+  if (httr::status_code(resp) >= 400L) {
+    resp_get <- httr::GET(
+      url   = endpoint_url,
+      query = list(query = SPARQL.query, format = "text/csv"),
+      httr::accept("text/csv"),
+      httr::user_agent("correspondenceTables (R)")
+    )
+    httr::stop_for_status(resp_get)
+    csv_text <- httr::content(resp_get, as = "text", encoding = "UTF-8")
+  } else {
+    csv_text <- httr::content(resp, as = "text", encoding = "UTF-8")
+    # Rare: server responds XML on POST -> retry with GET
+    if (grepl("^\\s*<\\?xml|<sparql", csv_text, ignore.case = TRUE)) {
+      resp_get <- httr::GET(
+        url   = endpoint_url,
+        query = list(query = SPARQL.query, format = "text/csv"),
+        httr::accept("text/csv"),
+        httr::user_agent("correspondenceTables (R)")
+      )
+      httr::stop_for_status(resp_get)
+      csv_text <- httr::content(resp_get, as = "text", encoding = "UTF-8")
+    }
+  }
+  
+  data <- .read_sparql_csv(csv_text)
+  
+  # Cleanup of embedded line-breaks in character fields
+  data[] <- lapply(data, function(x) if (is.character(x)) gsub("\n", " ", x) else x)
+  
+  # CSV output (optional)
+  if (isTRUE(CSVout)) {
+    file_out <- paste0(prefix, "_", conceptScheme, "_", language, "_classification.csv")
+    utils::write.csv(data, file_out, row.names = FALSE)
+    message("Saved: ", file.path(getwd(), file_out))
+  } else if (is.character(CSVout)) {
+    utils::write.csv(data, CSVout, row.names = FALSE)
+    message("Saved: ", CSVout)
+  }
+  
+  if (isTRUE(showQuery)) {
+    return(list(SPARQL.query = SPARQL.query, scheme_uri = scheme_uri, ClassificationTable = data))
+  } else {
+    return(data)
+  }
+}
+
+
+
+# helpers (internal) ----------------------------------------------
+
+#' @keywords internal
+#' @noRd
+# --- Read CSV with 'row.names' sanitization (prevents duplicate errors) ---
+.read_sparql_csv <- function(csv_text) {
+  if (!nzchar(csv_text)) return(data.frame())
+  nl <- regexpr("\n", csv_text, fixed = TRUE)
+  if (nl > 0) {
+    header <- substr(csv_text, 1, nl - 1)
+    body   <- substr(csv_text, nl + 1, nchar(csv_text))
+    header <- sub("^row.names(,|$)", "row_names\\1", header)
+    header <- gsub(",row.names,", ",row_names,", header, fixed = TRUE)
+    header <- sub(",row.names$", ",row_names", header)
+    csv_text <- paste0(header, "\n", body)
+  }
+  utils::read.csv(
+    textConnection(csv_text),
+    stringsAsFactors = FALSE,
+    row.names = NULL,   # keep as a regular column
+    check.names = FALSE,
+    comment.char = ""   # do not treat '#' as comments
+  )
+}
+
+#' @keywords internal
+#' @noRd
+# --- ASK: verify that the ConceptScheme exists on the current endpoint ---
+.ask_scheme_exists <- function(endpoint_url, scheme_uri) {
+  ask_q <- sprintf("
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+ASK { ?c skos:inScheme <%s> }", scheme_uri)
+  resp <- httr::GET(
+    url   = endpoint_url,
+    query = list(query = ask_q),
+    httr::add_headers(Accept = "text/boolean, text/plain, application/sparql-results+json"),
+    httr::user_agent("correspondenceTables (R) / ASK")
+  )
+  httr::stop_for_status(resp)
+  txt <- httr::content(resp, as = "text", encoding = "UTF-8")
+  grepl("\\btrue\\b", tolower(txt))
+}
+
+#' @keywords internal
+#' @noRd
+# --- Lightweight ConceptScheme discovery (SPARQL) ---
+.discover_scheme_uri <- function(endpoint_url, prefix, conceptScheme, language = "en") {
+  probe <- sprintf("
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT ?scheme ?label WHERE {
+  ?scheme a skos:ConceptScheme ;
+          skos:prefLabel ?label .
+  FILTER (LANG(?label) = '%s')
+  FILTER (
+    CONTAINS(LCASE(STR(?scheme)), LCASE('%s')) ||
+    CONTAINS(LCASE(STR(?scheme)), LCASE('%s')) ||
+    CONTAINS(LCASE(STR(?label)),  LCASE('%s')) ||
+    CONTAINS(LCASE(STR(?label)),  LCASE('%s'))
+  )
+}
+ORDER BY ?scheme", language, prefix, conceptScheme, prefix, conceptScheme)
+  
+  resp <- httr::GET(
+    url   = endpoint_url,
+    query = list(query = probe),
+    httr::add_headers(Accept = "application/sparql-results+csv"),
+    httr::user_agent("correspondenceTables (R) / SPARQL")
+  )
+  httr::stop_for_status(resp)
+  csv <- httr::content(resp, as = "text", encoding = "UTF-8")
+  df <- .read_sparql_csv(csv)
+  if (nrow(df)) {
+    score <- function(u, lbl) {
+      s <- 0L
+      if (grepl("/scheme/?$", u)) s <- s + 3L
+      if (grepl(prefix, u, ignore.case = TRUE)) s <- s + 2L
+      if (grepl(conceptScheme, u, ignore.case = TRUE)) s <- s + 2L
+      if (grepl(prefix, lbl, ignore.case = TRUE)) s <- s + 1L
+      if (grepl(conceptScheme, lbl, ignore.case = TRUE)) s <- s + 1L
+      s
+    }
+    df$._score <- mapply(score, df$scheme, df$label, USE.NAMES = FALSE)
+    df <- df[order(-df$._score, df$scheme), ]
+    return(df$scheme[1])
+  }
+  
+  # Second broader probe (for the prefix only)
+  probe2 <- sprintf("
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT ?scheme ?label WHERE {
+  ?scheme a skos:ConceptScheme ;
+          skos:prefLabel ?label .
+  FILTER (LANG(?label) = '%s')
+  FILTER (
+    CONTAINS(LCASE(STR(?scheme)), LCASE('%s')) ||
+    CONTAINS(LCASE(STR(?label)),  LCASE('%s'))
+  )
+}
+ORDER BY ?scheme
+LIMIT 50", language, prefix, prefix)
+  
+  resp2 <- httr::GET(
+    url   = endpoint_url,
+    query = list(query = probe2),
+    httr::add_headers(Accept = "application/sparql-results+csv"),
+    httr::user_agent("correspondenceTables (R) / SPARQL")
+  )
+  httr::stop_for_status(resp2)
+  csv2 <- httr::content(resp2, as = "text", encoding = "UTF-8")
+  df2 <- .read_sparql_csv(csv2)
+  if (nrow(df2)) {
+    df2$._ends_scheme <- grepl("/scheme/?$", df2$scheme)
+    df2 <- df2[order(-as.integer(df2$._ends_scheme), df2$scheme), ]
+    return(df2$scheme[1])
+  }
+  
+  NA_character_
+}
+
+#' @keywords internal
+#' @noRd
+# --- Normalize an external mapping table (columns and trimming) ---
+.normalize_known_schemes <- function(df) {
+  if (is.null(df) || !is.data.frame(df) || !nrow(df)) return(NULL)
+  nms <- names(df)
+  nms <- sub("^concept\\s*scheme$", "ConceptScheme", nms, ignore.case = TRUE)
+  nms <- sub("^conceptscheme$",     "ConceptScheme", nms, ignore.case = TRUE)
+  nms <- sub("^concept_scheme$",    "ConceptScheme", nms, ignore.case = TRUE)
+  nms <- sub("^prefix$",            "Prefix",        nms, ignore.case = TRUE)
+  nms <- sub("^uri$",               "URI",           nms, ignore.case = TRUE)
+  nms <- sub("^source$",            "Endpoint",      nms, ignore.case = TRUE)  # optional
+  names(df) <- nms
+  
+  req_cols <- c("Prefix", "ConceptScheme", "URI")
+  if (!all(req_cols %in% names(df))) return(NULL)
+  
+  keep <- intersect(c(req_cols, "Endpoint"), names(df))
+  out  <- df[, keep, drop = FALSE]
+  
+  for (col in intersect(c("Prefix", "ConceptScheme", "URI", "Endpoint"), names(out))) {
+    if (is.character(out[[col]])) out[[col]] <- trimws(out[[col]])
+  }
+  out
+}
+
+#' @keywords internal
+#' @noRd
+# --- Get the mapping: first external override, otherwise classificationList(endpoint) ---
+.get_known_schemes_from_classificationList <- function(endpoint,
+                                                       knownSchemes_override = NULL) {
+  endpoint <- toupper(trimws(endpoint))
+  if (!endpoint %in% c("FAO","CELLAR")) {
+    stop("`endpoint` must be 'FAO' or 'CELLAR'.")
+  }
+  
+  # 1) Use mapping passed from outside, if present
+  ks <- .normalize_known_schemes(knownSchemes_override)
+  if (!is.null(ks)) {
+    if ("Endpoint" %in% names(ks)) {
+      ks_src <- ks[toupper(ks$Endpoint) == endpoint, setdiff(names(ks), "Endpoint"), drop = FALSE]
+      if (nrow(ks_src)) return(ks_src)
+      # if the table is single-source or has no marked rows, use everything
+    }
+    return(ks)
+  }
+  
+  # 2) Fallback: invoke classificationList(endpoint)
+  if (!exists("classificationList", mode = "function")) return(NULL)
+  df <- try(classificationList(endpoint), silent = TRUE)
+  if (inherits(df, "try-error") || is.null(df)) return(NULL)
+  ks2 <- .normalize_known_schemes(df)
+  if (is.null(ks2)) return(NULL)
+  ks2[, c("Prefix","ConceptScheme","URI"), drop = FALSE]
+}
+
+#' @keywords internal
+#' @noRd
+# --- Resolver: mapping -> discovery -> (pattern-based fallback only for CELLAR) ---
+.resolve_scheme_uri <- function(endpoint_url,
+                                endpoint,
+                                prefix,
+                                conceptScheme,
+                                language = "en",
+                                knownSchemes = NULL,
+                                preferMappingOnly = FALSE) {
+  endpoint <- toupper(trimws(endpoint))
+  if (!endpoint %in% c("FAO","CELLAR")) {
+    stop("`endpoint` must be 'FAO' or 'CELLAR'.")
+  }
+  
+  # 1) Mapping (external override -> classificationList(endpoint))
+  known_schemes <- .get_known_schemes_from_classificationList(
+    endpoint = endpoint,
+    knownSchemes_override = knownSchemes
+  )
+  
+  if (!is.null(known_schemes) && nrow(known_schemes)) {
+    ks_pref   <- tolower(trimws(known_schemes[["Prefix"]]))
+    ks_cs     <- tolower(trimws(known_schemes[["ConceptScheme"]]))
+    want_pref <- tolower(trimws(prefix))
+    want_cs   <- tolower(trimws(conceptScheme))
+    idx <- which(ks_pref == want_pref & ks_cs == want_cs)
+    if (length(idx)) {
+      hit <- known_schemes[idx, , drop = FALSE]
+      # heuristic: prefer URIs that end with /scheme
+      ends_scheme <- grepl("/scheme/?$", hit[["URI"]])
+      ord <- order(!ends_scheme, hit[["URI"]], decreasing = TRUE)
+      hit <- hit[ord, , drop = FALSE]
+      uri <- hit[["URI"]][1]
+      if (isTRUE(.ask_scheme_exists(endpoint_url, uri))) return(uri)
+      if (isTRUE(preferMappingOnly)) return(NA_character_)  # requested: no discovery/fallback
+    } else if (isTRUE(preferMappingOnly)) {
+      return(NA_character_)
+    }
+  } else if (isTRUE(preferMappingOnly)) {
+    return(NA_character_)
+  }
+  
+  # 2) SPARQL discovery (if not blocked)
+  disc <- try(.discover_scheme_uri(endpoint_url, prefix, conceptScheme, language), silent = TRUE)
+  if (!inherits(disc, "try-error") && is.character(disc) && nzchar(disc)) {
+    if (.ask_scheme_exists(endpoint_url, disc)) return(disc)
+  }
+  
+  # 3) Legacy fallback only for CELLAR (validated with ASK)
+  if (identical(endpoint, "CELLAR")) {
+    pat <- paste0("http://data.europa.eu/xsp/", tolower(prefix), "/", conceptScheme)
+    if (.ask_scheme_exists(endpoint_url, pat)) return(pat)
+  }
+  
+  NA_character_
 }

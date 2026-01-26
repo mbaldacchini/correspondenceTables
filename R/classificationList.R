@@ -111,6 +111,7 @@
 #' @import jsonlite
 #' @importFrom utils capture.output str
 #' @export
+
 classificationList <- function(endpoint = "ALL", showQuery = FALSE) {
   endpoint <- toupper(endpoint)
   if (!(endpoint %in% c("ALL", "FAO", "CELLAR"))) {
@@ -146,7 +147,8 @@ classificationList <- function(endpoint = "ALL", showQuery = FALSE) {
   if (is.null(config)) {
     config <- list(
       CELLAR = "https://publications.europa.eu/webapi/rdf/sparql",
-      FAO    = "https://stats.fao.org/caliper/sparql"
+      # FAO    = "https://stats.fao.org/caliper/sparql"
+      FAO    = "https://caliper.integratedmodelling.org/caliper/sparql"
     )
   }
   
@@ -275,7 +277,7 @@ if (showQuery) {
 # -------------------------------------------------------------------
 #' @keywords internal
 #' @noRd
-.ct_clean_prefix <- function(prefix) {
+.ct_clean_prefix <- function(prefix) { 
   prefix <- tolower(prefix)
   
   # remove version suffixes like "_v2.1" or "-v2"
@@ -293,3 +295,11 @@ if (showQuery) {
   
   trimws(prefix)
 }
+
+
+
+
+
+
+
+
