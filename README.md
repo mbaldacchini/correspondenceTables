@@ -39,27 +39,17 @@ This package serves as a tool to assist you in creating and updating a correspon
 
 The package contains 11 functions:
 
-1. `newCorrespondenceTable` to create a candidate correspondence table between two classifications when there are correspondence tables leading from the first classification to the second one via intermediate 'pivot' classifications.
-
-2. `updateCorrespondenceTable` to update the correspondence table between two statistical classifications when one of the classifications gets updated to a new version.
-
-3. `prefixList` Create a list of prefixes for both CELLAR and FAO repositories.
-
-4. `CorrespondenceList` Overview of all the available correspondence classification from CELLAR and FAO repository.
-
-5. `dataStructure`  Retrieve information about the structure of each classification tables from CELLAR and FAO repositories.
-
-6. `classificationEndpoint` Retrieve a list of classification tables from CELLAR and FAO repositories or both.
-
-7. `retrieveClassificationTable` Retrieve stastistical classification tables from CELLAR and FAO repositories.
-
-8. `retrieveCorrespondenceTable.` Retrieve correspondence tables between statistical classifications from CELLAR and FAO repositories.
-
-9. `classificationQC` performs quality control checks on statistical classifications.
-
-10. `analyseCorrespondancetable` performs analysis on correspondence tables.  
-
-11. `aggregateCorrespondenceTable` aggregates correspondence tables to higher hierarchical levels.
+1. aggregateCorrespondenceTable	Aggregate values from classification A to classification B
+2. analyseCorrespondenceTable	Perform analysis on correspondence tables
+3. classificationList	List available classification schemes from CELLAR or FAO
+4. classificationQC	Perform quality control on a classification
+5. correspondenceTableList	List available correspondence tables from online services
+6. dataStructure	Retrieve a classification structure (levels and concepts) from a supported service
+7. newCorrespondenceTable	Correspondence table creation
+8. prefixList	Build SPARQL PREFIX declarations for an endpoint
+9. retrieveClassificationTable	Retrieve a full classification table from CELLAR or FAO
+10. retrieveCorrespondenceTable	Download a correspondence (mapping) table between two classifications
+11. updateCorrespondenceTable	Correspondence table creation
 
 ## Examples
 
